@@ -12,8 +12,12 @@ export default function Home() {
   // const [selectedCorrectIndexes, setSelectedCorrectIndexes] = useState<string[]>([]);
 
   async function startGame() {
+    const baseUrl =
+      process.env.NODE_ENV === "development"
+      ? "http://localhost:8153"
+      : "https://khawawish.mahirou.online/api";
     const result = await fetch(
-      `http://localhost:8153/images?seed=${seed}&max_images=${maxImages}`
+      `${baseUrl}/images?seed=${seed}&max_images=${maxImages}`
     )
       .then((res) => res.json())
       .catch((err) => {
