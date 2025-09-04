@@ -87,7 +87,7 @@ export default function Home() {
             {images.map((img, index) => (
               <div
                 key={index}
-                className={`border p-2 cursor-pointer relative ${
+                className={`group border p-2 cursor-pointer relative ${
                   selectedIndexes.includes(index.toString())
                     ? "border-red-500"
                     : ""
@@ -107,11 +107,11 @@ export default function Home() {
                 <img
                   src={`${baseUrl}/static/images/${img}`}
                   alt={`Character ${index + 1}`}
-                  className="w-32 h-32 object-cover mx-auto"
+                  className=" w-32 h-32 object-cover mx-auto"
                   style={{ maxWidth: "128px", maxHeight: "128px" }}
                 />
                 {selectedIndexes.includes(index.toString()) && (
-                  <span className="absolute top-6 right-6 bg-red-500 text-white rounded-full p-5 font-bold">
+                  <span className="absolute top-6 right-6 bg-red-500 text-white rounded-full p-5 font-bold opacity-95 group-hover:opacity-20 transition-opacity duration-100">
                     <X size={50}/>
                   </span>
                 )}
