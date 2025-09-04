@@ -1,0 +1,2 @@
+2025-09-04 15:51:40,737 - tortoise - INFO - Tortoise-ORM started, {'default': <tortoise.backends.asyncpg.client.AsyncpgDBClient object at 0x000001744194CD70>}, {'models': {'GameRoom': <class 'models.game.GameRoom'>, 'Player': <class 'models.game.Player'>, 'Aerich': <class 'aerich.models.Aerich'>}}
+2025-09-04 15:51:40,738 - tortoise - INFO - Tortoise-ORM generating schema
