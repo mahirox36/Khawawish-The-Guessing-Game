@@ -1,7 +1,6 @@
 
 **.vscode/
 .env
-
-**.json
+data.json
 static/images/
 __pycache__/
