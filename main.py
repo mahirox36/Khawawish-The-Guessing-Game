@@ -59,7 +59,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 games = []
 
-api = APIRouter()
+api = APIRouter(prefix="api")
 
 
 def get_static_file_names():

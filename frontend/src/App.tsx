@@ -15,7 +15,7 @@ export default function Home() {
     const baseUrl =
       process.env.NODE_ENV === "development"
       ? "http://localhost:8153"
-      : "https://khawawish.mahirou.online";
+      : "https://khawawish.mahirou.online/api";
     const result = await fetch(
       `${baseUrl}/images?seed=${seed}&max_images=${maxImages}`
     )
