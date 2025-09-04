@@ -10,12 +10,12 @@ export default function Home() {
   const [ownImage, setOwnImage] = useState<string[]>([]);
   const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);
   // const [selectedCorrectIndexes, setSelectedCorrectIndexes] = useState<string[]>([]);
-
-  async function startGame() {
-    const baseUrl =
+  const baseUrl =
       process.env.NODE_ENV === "development"
       ? "http://localhost:8153"
       : "https://khawawish.mahirou.online/api";
+
+  async function startGame() {
     const result = await fetch(
       `${baseUrl}/images?seed=${seed}&max_images=${maxImages}`
     )
@@ -105,7 +105,7 @@ export default function Home() {
                 }}
                 >
                 <img
-                  src={`http://localhost:8153/static/images/${img}`}
+                  src={`${baseUrl}/static/images/${img}`}
                   alt={`Character ${index + 1}`}
                   className="w-32 h-32 object-cover mx-auto"
                   style={{ maxWidth: "128px", maxHeight: "128px" }}
