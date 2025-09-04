@@ -15,7 +15,7 @@ export default function Home() {
     const baseUrl =
       process.env.NODE_ENV === "development"
       ? "http://localhost:8153"
-      : "https://khawawish.mahirou.online/api";
+      : "https://khawawish.mahirou.online";
     const result = await fetch(
       `${baseUrl}/images?seed=${seed}&max_images=${maxImages}`
     )
@@ -65,6 +65,8 @@ export default function Home() {
                 id="maxImages"
                 value={maxImages}
                 onChange={(e) => setMaxImages(Number(e.target.value))}
+                min={0}
+                max={602}
                 className="border border-gray-300 rounded-md px-3 py-2 w-48"
               />
             </div>
