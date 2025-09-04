@@ -9,7 +9,7 @@ export default function Home() {
   const [images, setImages] = useState<string[]>([]);
   const [ownImage, setOwnImage] = useState<string[]>([]);
   const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);
-  const [selectedCorrectIndexes, setSelectedCorrectIndexes] = useState<string[]>([]);
+  // const [selectedCorrectIndexes, setSelectedCorrectIndexes] = useState<string[]>([]);
 
   async function startGame() {
     const result = await fetch(
