@@ -1,57 +1,89 @@
+from enum import StrEnum
 from tortoise.models import Model
 from tortoise import fields
-from enum import Enum
-import random
-import string
+from datetime import datetime
 
-class GameStatus(str, Enum):
+
+class User(Model):
+    """User model for authentication and game statistics"""
+
+    user_id = fields.CharField(max_length=50, pk=True)
+    username = fields.CharField(max_length=50, unique=True)
+    email = fields.CharField(max_length=100, unique=True)
+    password_hash = fields.CharField(max_length=255)
+    display_name = fields.CharField(max_length=100)
+
+    # Profile info
+    avatar_url = fields.CharField(max_length=500, null=True)
+    bio = fields.TextField(null=True)
+
+    # Game statistics
+    games_played = fields.IntField(default=0)
+    games_won = fields.IntField(default=0)
+    total_score = fields.IntField(default=0)
+    best_streak = fields.IntField(default=0)
+    current_streak = fields.IntField(default=0)
+
+    # Account status
+    is_active = fields.BooleanField(default=True)
+    is_verified = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    last_login = fields.DatetimeField(null=True)
+
+    class Meta:
+        table = "users"
+
+    def __str__(self):
+        return f"User({self.username})"
+
+    @property
+    def win_rate(self) -> float:
+        if self.games_played == 0:
+            return 0.0
+        return (self.games_won / self.games_played) * 100
+
+    @property
+    def average_score(self) -> float:
+        if self.games_played == 0:
+            return 0.0
+        return self.total_score / self.games_played
+
+
+class GameSessionStatus(StrEnum):
+    """Enum for game session status"""
+
     WAITING = "waiting"
-    CHARACTER_SELECTION = "character_selection"  # New state for character selection phase
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
-class GameMode(str, Enum):
-    TEXT = "text"      # Players type questions and answers in-game
-    VOICE = "voice"    # Players use external voice chat like Discord
 
-class GameRoom(Model):
-    id = fields.IntField(pk=True)
-    code = fields.CharField(max_length=10, unique=True)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    status = fields.CharEnumField(GameStatus, default=GameStatus.WAITING)
-    
+class GameSession(Model):
+    """Model to track game sessions/lobbies"""
+
+    session_id = fields.CharField(max_length=50, pk=True)
+    lobby_id = fields.CharField(max_length=20)
+    creator_id = fields.CharField(max_length=50)
+
     # Game configuration
-    num_characters = fields.IntField(default=12)
-    is_private = fields.BooleanField(default=False)
-    password = fields.CharField(max_length=20, null=True)
-    time_limit_seconds = fields.IntField(default=0)  # 0 means no limit
-    allow_spectators = fields.BooleanField(default=True)
-    max_players = fields.IntField(default=2)
-    game_mode = fields.CharEnumField(GameMode, default=GameMode.TEXT)
-    
-    # Relationships
-    players: fields.ReverseRelation["Player"]
-    selected_characters = fields.JSONField(default=list)  # List of character IDs
-    
-    @classmethod
-    async def create_game_room(cls, **kwargs) -> "GameRoom":
-        """Create a new game room with a unique code"""
-        while True:
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-            if not await cls.filter(code=code).exists():
-                return await cls.create(code=code, **kwargs)
-                
-    class Meta:
-        table = "game_rooms"
+    max_players = fields.IntField(default=8)
+    game_config = fields.JSONField(
+        default=dict
+    )  # Store game settings like max_images, seed, etc.
 
-class Player(Model):
-    id = fields.IntField(pk=True)
-    name = fields.CharField(max_length=50)
-    is_host = fields.BooleanField(default=False)
-    is_spectator = fields.BooleanField(default=False)
-    selected_character = fields.CharField(max_length=100, null=True)  # ID of the character this player selected
-    is_ready = fields.BooleanField(default=False)  # Added for player ready status
-    room = fields.ForeignKeyField("models.GameRoom", related_name="players")
-    
+    # Game state
+    status = fields.CharEnumField(enum_type=GameSessionStatus, default="waiting")
+    started_at = fields.DatetimeField(null=True)
+    ended_at = fields.DatetimeField(null=True)
+    winner_id = fields.CharField(max_length=50, null=True)
+
+    # Timestamps
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
     class Meta:
-        table = "players"
+        table = "game_sessions"
+
+    def __str__(self):
+        return f"GameSession({self.lobby_id} - {self.status})"

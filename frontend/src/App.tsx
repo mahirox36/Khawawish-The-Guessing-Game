@@ -1,125 +1,265 @@
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAuth } from "./contexts/AuthContext";
+import { Login } from "./components/Login";
+import { Register } from "./components/Register";
+import { Game } from "./components/Game";
+import { LobbyList } from "./components/LobbyList";
+import { CreateLobby } from "./components/CreateLobby";
+import { api, baseUrl } from "./api";
+import { Lobby } from "./types";
 
-export default function Home() {
-  // Lobby Creation State
-  const [seed, setSeed] = useState<number>(Math.floor(Math.random() * 1000000));
-  const [maxImages, setMaxImages] = useState<number>(25);
-  const [page, setPage] = useState<"lobby" | "game">("lobby");
+export default function App() {
+  const { user, token, logout } = useAuth();
+  const [page, setPage] = useState<"auth" | "lobby" | "game">("auth");
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [subPage, setSubPage] = useState<"list" | "create" | "waiting" | null>(
+    null
+  );
+  const [lobbies, setLobbies] = useState<Lobby[]>([]);
+  const [currentLobby, setCurrentLobby] = useState<Lobby | null>(null);
   const [images, setImages] = useState<string[]>([]);
-  const [ownImage, setOwnImage] = useState<string[]>([]);
-  const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);
-  // const [selectedCorrectIndexes, setSelectedCorrectIndexes] = useState<string[]>([]);
-  const baseUrl =
-      process.env.NODE_ENV === "development"
-      ? "http://localhost:8153"
-      : "https://khawawish.mahirou.online/api";
+  const [ws, setWs] = useState<WebSocket | null>(null);
 
-  async function startGame() {
-    const result = await fetch(
-      `${baseUrl}/images?seed=${seed}&max_images=${maxImages}`
-    )
-      .then((res) => res.json())
-      .catch((err) => {
-        console.error("Error fetching images:", err);
-        return { images: [] };
-      });
-    setImages(result.files);
-    setPage("game");
-    console.log(result);
-  }
+  useEffect(() => {
+    if (token) {
+      fetchLobbies();
+      setPage("lobby");
+    }
+    if (!token) return;
+    const ws = new WebSocket(`${baseUrl}/ws/game?token=${token}`);
+    setWs(ws);
 
-  return (
-    <div className="flex flex-col items-center  min-h-screen py-2">
-      {page === "lobby" ? (
-        <div>
-          <h1 className="text-6xl font-bold">
-            Welcome Khawawish: The Guessing Game
-          </h1>
-          <p className="mt-3 text-2xl">
-            Select the seed and the max Characters as your friend to start
-            playing!
-          </p>
-          <div className="mt-6 flex flex-col items-center">
-            <div className="mb-4">
-              <label className="block text-lg font-medium mb-2" htmlFor="seed">
-                Seed:
-              </label>
-              <input
-                type="number"
-                id="seed"
-                value={seed}
-                onChange={(e) => setSeed(Number(e.target.value))}
-                className="border border-gray-300 rounded-md px-3 py-2 w-48"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                className="block text-lg font-medium mb-2"
-                htmlFor="maxImages"
-              >
-                Max Characters:
-              </label>
-              <input
-                type="number"
-                id="maxImages"
-                value={maxImages}
-                onChange={(e) => setMaxImages(Number(e.target.value))}
-                min={0}
-                max={602}
-                className="border border-gray-300 rounded-md px-3 py-2 w-48"
-              />
-            </div>
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "sign" }));
+    };
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data.toString());
+      console.log("Received message:", message);
+
+      switch (message.type) {
+        case "ping":
+          ws.send(JSON.stringify({ type: "pong" }));
+          break;
+        case "lobby_created":
+        case "lobby_joined":
+          setCurrentLobby(message.lobby);
+          setSubPage("waiting");
+          break;
+        case "game_started":
+          setImages(message.images);
+          setPage("game");
+          break;
+        case "player_joined":
+        case "player_left":
+        case "player_ready_changed":
+          setCurrentLobby(message.lobby);
+          break;
+        case "new_lobby":
+          setLobbies(message.public_lobbies);
+          break;
+        default:
+          console.warn("Unknown message type:", message.type);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+  }, [token]);
+
+  const fetchLobbies = async () => {
+    try {
+      const result = await api.get("/lobbies");
+      setLobbies(result.data.public_lobbies);
+    } catch (error) {
+      console.error("Failed to fetch lobbies:", error);
+    }
+  };
+
+  const handleCreateLobby = (data: {
+    maxImages: number;
+    lobbyName: string;
+    password: string | null;
+    isPrivate: boolean;
+  }) => {
+    ws?.send(
+      JSON.stringify({
+        type: "create_lobby",
+        ...data,
+      })
+    );
+  };
+
+  const handleJoinLobby = (lobbyId: string, hasPassword: boolean) => {
+    const password = hasPassword ? prompt("Enter lobby password:") : null;
+    ws?.send(
+      JSON.stringify({
+        type: "join_lobby",
+        lobby_id: lobbyId,
+        password,
+      })
+    );
+  };
+
+  const handleAuthSuccess = () => {
+    setPage("lobby");
+    fetchLobbies();
+  };
+
+  const handleReadyClick = () => {
+    ws?.send(JSON.stringify({ type: "ready", ready: true }));
+  };
+
+  const handleStartGame = () => {
+    ws?.send(JSON.stringify({ type: "start_game" }));
+  };
+
+  const handleCharacterSelect = (character: string) => {
+    ws?.send(JSON.stringify({ type: "select_character", character }));
+  };
+
+  const handleOwnCharacterSelect = (character: string) => {
+    ws?.send(JSON.stringify({ type: "select_own_character", character }));
+  };
+
+  if (page === "auth") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              Welcome to Khawawish
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {authMode === "login"
+                ? "Sign in to your account"
+                : "Create a new account"}
+            </p>
+          </div>
+
+          {authMode === "login" ? (
+            <Login onSuccess={handleAuthSuccess} />
+          ) : (
+            <Register onSuccess={handleAuthSuccess} />
+          )}
+
+          <div className="text-center">
             <button
-              className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-600"
-              onClick={() => {
-                startGame();
-              }}
+              className="text-blue-600 hover:text-blue-500"
+              onClick={() =>
+                setAuthMode(authMode === "login" ? "register" : "login")
+              }
             >
-              Start Game
+              {authMode === "login"
+                ? "Need an account? Register"
+                : "Already have an account? Sign in"}
             </button>
           </div>
         </div>
-      ) : (
-        <div>
-          <h1 className="text-4xl font-bold mb-6">Characters</h1>
-          <div className="grid grid-cols-5 gap-4">
-            {images.map((img, index) => (
-              <div
-                key={index}
-                className={`group border p-2 cursor-pointer relative ${
-                  selectedIndexes.includes(index.toString())
-                    ? "border-red-500"
-                    : ""
-                } ${ownImage.includes(img) ? "border-green-500 border-4" : ""}`} 
+      </div>
+    );
+  }
+
+  if (page === "lobby") {
+    return (
+      <div className="min-h-screen p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold">Khawawish: The Guessing Game</h1>
+            <div className="flex items-center space-x-4">
+              <span>Welcome, {user?.display_name}</span>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
                 onClick={() => {
-                  setSelectedIndexes((prev) =>
-                    prev.includes(index.toString())
-                      ? prev.filter((i) => i !== index.toString())
-                      : [...prev, index.toString()]
-                  );
+                  logout();
+                  window.location.reload();
                 }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setOwnImage([img]);
-                }}
-                >
-                <img
-                  src={`${baseUrl}/static/images/${img}`}
-                  alt={`Character ${index + 1}`}
-                  className=" w-32 h-32 object-cover mx-auto"
-                  style={{ maxWidth: "128px", maxHeight: "128px" }}
-                />
-                {selectedIndexes.includes(index.toString()) && (
-                  <span className="absolute top-6 right-6 bg-red-500 text-white rounded-full p-5 font-bold opacity-95 group-hover:opacity-20 transition-opacity duration-100">
-                    <X size={50}/>
-                  </span>
-                )}
-              </div>
-            ))}
+              >
+                Logout
+              </button>
+            </div>
           </div>
+
+          {subPage === "waiting" && currentLobby ? (
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-3xl font-bold mb-6">Waiting Room</h2>
+              <div className="bg-white shadow rounded-lg p-6">
+                <div className="mb-4">
+                  <h3 className="text-xl font-semibold mb-2">
+                    Lobby: {currentLobby.lobby_name}
+                  </h3>
+                  <p className="text-gray-600">
+                    Share ID: {currentLobby.lobby_id}
+                  </p>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="text-lg font-medium mb-2">Players:</h4>
+                  <div className="space-y-2">
+                    {Object.entries(currentLobby.players).map(
+                      ([id, player]) => (
+                        <div
+                          key={id}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{player.display_name}</span>
+                          <span
+                            className={
+                              player.is_ready
+                                ? "text-green-500"
+                                : "text-gray-500"
+                            }
+                          >
+                            {player.is_ready ? "Ready" : "Not Ready"}
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-center space-x-4">
+                  <button
+                    className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600"
+                    onClick={handleReadyClick}
+                  >
+                    Ready
+                  </button>
+                  {currentLobby.creator_id === user?.user_id && (
+                    <button
+                      className="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600"
+                      onClick={handleStartGame}
+                    >
+                      Start Game
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Create New Lobby</h2>
+                <CreateLobby onCreateLobby={handleCreateLobby} />
+              </div>
+              <div>
+                <LobbyList lobbies={lobbies} onJoinLobby={handleJoinLobby} />
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-8">
+      <Game
+        images={images}
+        onSelectCharacter={handleCharacterSelect}
+        onOwnCharacterSelect={handleOwnCharacterSelect}
+      />
     </div>
   );
 }
