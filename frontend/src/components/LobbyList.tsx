@@ -1,4 +1,6 @@
 import { Lobby } from '../types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Lock, Users, Image } from 'lucide-react';
 
 interface LobbyListProps {
   lobbies: Lobby[];
@@ -7,39 +9,71 @@ interface LobbyListProps {
 
 export function LobbyList({ lobbies, onJoinLobby }: LobbyListProps) {
   return (
-    <div className="flex flex-col items-center">
-      <h2 className="text-2xl font-bold mb-4">Available Lobbies</h2>
-      <div className="max-h-96 overflow-y-auto w-full max-w-2xl">
-        {lobbies.length > 0 ? (
-          lobbies.map((lobby) => (
-            <div
-              key={lobby.lobby_id}
-              className="border p-4 mb-4 rounded-md w-full"
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Available Lobbies</h2>
+      <div className="max-h-[600px] overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+        <AnimatePresence mode="popLayout">
+          {lobbies.length > 0 ? (
+            lobbies.map((lobby) => (
+              <motion.div
+                key={lobby.lobby_id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                whileHover={{ scale: 1.02 }}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden
+                         border border-gray-200 dark:border-gray-700 hover:shadow-lg
+                         transition-all duration-200"
+              >
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {lobby.lobby_name}
+                      </h3>
+                      <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center space-x-1">
+                          <Users size={16} />
+                          <span>{lobby.player_count}/2 Players</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Image size={16} />
+                          <span>{lobby.max_images} Characters</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      {lobby.has_password && (
+                        <Lock className="text-game-accent" size={20} />
+                      )}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => onJoinLobby(lobby.lobby_id, lobby.has_password)}
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-white
+                                 bg-gradient-to-r from-game-primary to-game-secondary
+                                 hover:opacity-90 transition-all duration-200
+                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary"
+                      >
+                        Join Lobby
+                      </motion.button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-12"
             >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{lobby.lobby_name}</h3>
-                  <p className="text-sm text-gray-600">ID: {lobby.lobby_id}</p>
-                  <p className="text-sm text-gray-600">Players: {lobby.player_count}</p>
-                  <p className="text-sm text-gray-600">Max Images: {lobby.max_images}</p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {lobby.has_password && (
-                    <span className="text-yellow-500">🔒</span>
-                  )}
-                  <button
-                    className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors"
-                    onClick={() => onJoinLobby(lobby.lobby_id, lobby.has_password)}
-                  >
-                    Join Lobby
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-center text-gray-500">No lobbies available. Create one!</p>
-        )}
+              <p className="text-gray-500 dark:text-gray-400 text-lg">
+                No lobbies available yet. Create one to start playing!
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

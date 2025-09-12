@@ -196,6 +196,24 @@ class ConnectionManager:
                     pass
 
 
+class Player:
+    def __init__(self, user_id: str, username: str, display_name: str):
+        self.user_id = user_id
+        self.username = username
+        self.display_name = display_name
+        self.is_ready = False
+        self.character: Optional[str] = None
+
+    def to_dict(self):
+        # Hidden the character field for privacy
+        return {
+            "user_id": self.user_id,
+            "username": self.username,
+            "display_name": self.display_name,
+            "is_ready": self.is_ready,
+        }
+
+
 class GameLobby:
     def __init__(
         self,
@@ -206,13 +224,17 @@ class GameLobby:
         lobby_name: str = "Game Lobby",
         creator_id: str = "",
         is_private: bool = False,
+        owner_id: str = "",
+        owner_username: str = "",
+        owner_display_name: str = "",
     ):
         self.lobby_id = lobby_id
         self.max_characters = max_characters
         self.seed = seed
-        self.players: dict[str, dict] = (
-            {}
-        )  # user_id -> {username, display_name, is_ready}
+        self.owner: Optional[Player] = Player(
+            owner_id, owner_username, owner_display_name
+        )
+        self.second_player: Optional[Player] = None
         self.password: str | None = password
         self.lobby_name = lobby_name
         self.creator_id = creator_id
@@ -220,31 +242,64 @@ class GameLobby:
         self.state: dict = {}  # custom game state (characters, etc.)
         self.created_at = utcnow()
         self.game_started = False
+        self.user_turn = owner_id
 
-    def add_player(self, user_id: str, username: str, display_name: str):
-        if user_id not in self.players:
-            self.players[user_id] = {
-                "username": username,
-                "display_name": display_name,
-                "is_ready": False,
-                "score": 0,
-            }
+    def switch_turn(self):
+        if not self.owner or not self.second_player:
+            return
+        if self.user_turn == self.owner.user_id:
+            self.user_turn = self.second_player.user_id
+        else:
+            self.user_turn = self.owner.user_id
+
+    def add_second_player(self, user_id: str, username: str, display_name: str):
+        if not self.second_player:
+            self.second_player = Player(user_id, username, display_name)
 
     def remove_player(self, user_id: str):
-        if user_id in self.players:
-            self.players.pop(user_id, None)
+        if self.owner and self.second_player and user_id == self.owner.user_id:
+            self.owner = self.second_player
+            self.second_player = None
+        elif self.second_player and user_id == self.second_player.user_id:
+            self.second_player = None
+        elif self.owner and user_id == self.owner.user_id:
+            self.owner = None
 
     def is_empty(self) -> bool:
-        return not self.players
+        return self.second_player is None and self.owner is None
 
     def set_player_ready(self, user_id: str, ready: bool = True):
-        if user_id in self.players:
-            self.players[user_id]["is_ready"] = ready
+        if self.owner and self.owner.user_id == user_id:
+            self.owner.is_ready = ready
+        elif self.second_player and self.second_player.user_id == user_id:
+            self.second_player.is_ready = ready
 
     def all_players_ready(self) -> bool:
-        return len(self.players) > 0 and all(
-            player["is_ready"] for player in self.players.values()
+        players = [p for p in [self.owner, self.second_player] if p]
+        return len(players) > 0 and all(player.is_ready for player in players)
+
+    def set_player_character(self, user_id: str, character: str):
+        if self.owner and self.owner.user_id == user_id:
+            self.owner.character = character
+        elif self.second_player and self.second_player.user_id == user_id:
+            self.second_player.character = character
+
+    def all_players_selected(self) -> bool:
+        players = [p for p in [self.owner, self.second_player] if p]
+        return len(players) > 0 and all(
+            player.character is not None for player in players
         )
+
+    def guess_character(self, user_id: str, character: str) -> bool:
+        player = None
+        if self.owner and self.owner.user_id == user_id:
+            player = self.second_player
+        elif self.second_player and self.second_player.user_id == user_id:
+            player = self.owner
+
+        if player and player.character == character:
+            return True
+        return False
 
     async def get_images(self):
         random.seed(self.seed)
@@ -252,19 +307,31 @@ class GameLobby:
             static_file_names, min(self.max_characters, len(static_file_names))
         )
 
+    def player_counter(self):
+        count = 0
+        if self.owner:
+            count += 1
+        if self.second_player:
+            count += 1
+        return count
+
     def to_dict(self):
         return {
             "lobby_id": self.lobby_id,
             "lobby_name": self.lobby_name,
             "max_images": self.max_characters,
             "seed": self.seed,
-            "players": self.players,
+            "owner": self.owner.to_dict() if self.owner else None,
+            "second_player": (
+                self.second_player.to_dict() if self.second_player else None
+            ),
             "has_password": self.password is not None,
             "is_private": self.is_private,
             "creator_id": self.creator_id,
             "created_at": self.created_at.isoformat(),
             "game_started": self.game_started,
-            "player_count": len(self.players),
+            "user_turn": self.user_turn,
+            "player_count": self.player_counter(),
         }
 
 
@@ -280,10 +347,22 @@ class LobbyManager:
         lobby_name: str = "Game Lobby",
         creator_id: str = "",
         is_private: bool = False,
+        owner_id: str = "",
+        owner_username: str = "",
+        owner_display_name: str = "",
     ) -> GameLobby:
         lobby_id = str(uuid.uuid4())[:8]  # Shorter lobby IDs
         lobby = GameLobby(
-            lobby_id, max_characters, seed, password, lobby_name, creator_id, is_private
+            lobby_id,
+            max_characters,
+            seed,
+            password,
+            lobby_name,
+            creator_id,
+            is_private,
+            owner_id,
+            owner_username,
+            owner_display_name,
         )
         cls.lobbies[lobby_id] = lobby
         return lobby
@@ -370,15 +449,15 @@ class GameWebSocket:
                     if not self.signed_in:
                         self.connection.add(self.user.user_id, self)
                     lobby = LobbyManager.create_lobby(
-                        data.get("max_images", 25),
+                        data.get("maxImages", 25),
                         str(uuid.uuid4()),
                         data.get("password", None),
-                        data.get("lobby_name", "Game Lobby"),
+                        data.get("lobbyName", "Game Lobby"),
                         self.user.user_id,
-                        data.get("is_private", False),
-                    )
-                    lobby.add_player(
-                        self.user.user_id, self.user.username, self.user.display_name
+                        data.get("isPrivate", False),
+                        self.user.user_id,
+                        self.user.username,
+                        self.user.display_name,
                     )
                     self.lobby_id = lobby.lobby_id
                     await self.websocket.send_json(
@@ -416,7 +495,7 @@ class GameWebSocket:
                         continue
                     if not self.signed_in:
                         self.connection.add(self.user.user_id, self)
-                    lobby.add_player(
+                    lobby.add_second_player(
                         self.user.user_id, self.user.username, self.user.display_name
                     )
                     self.lobby_id = lobby_id
@@ -489,7 +568,7 @@ class GameWebSocket:
                         session_id=str(uuid.uuid4()),
                         lobby_id=lobby.lobby_id,
                         creator_id=lobby.creator_id,
-                        max_players=len(lobby.players),
+                        max_players=2,
                         game_config={
                             "max_images": lobby.max_characters,
                             "seed": lobby.seed,
@@ -505,20 +584,106 @@ class GameWebSocket:
                         self.lobby_id,
                     )
 
-                elif msg_type == "select_character":
+                elif msg_type == "select_own_character":
                     character = data.get("character")
                     lobby = LobbyManager.get(self.lobby_id)
                     if lobby and character:
+                        lobby.set_player_character(self.user.user_id, character)
+                        if lobby.all_players_selected():
+                            await self.connection.broadcast_lobby(
+                                {
+                                    "type": "selection_complete",
+                                    "lobby": lobby.to_dict(),
+                                },
+                                self.lobby_id,
+                            )
+                elif msg_type == "guess":
+                    guessed_character = data.get("character")
+                    lobby = LobbyManager.get(self.lobby_id)
+                    if lobby and guessed_character:
+                        if lobby.guess_character(self.user.user_id, guessed_character):
+                            lobby.switch_turn()
+                            await self.websocket.send_json(
+                                {
+                                    "type": "correct_guess",
+                                    "user_id": self.user.user_id,
+                                    "username": self.user.username,
+                                    "display_name": self.user.display_name,
+                                    "character": guessed_character,
+                                }
+                            )
+                            await self.connection.broadcast_lobby(
+                                {
+                                    "type": "player_scored",
+                                    "user_id": self.user.user_id,
+                                    "username": self.user.username,
+                                    "display_name": self.user.display_name,
+                                    "character": guessed_character,
+                                    "lobby": lobby.to_dict(),
+                                },
+                                self.lobby_id,
+                                [self.user.user_id],
+                            )
+                        else:
+                            lobby.switch_turn()
+                            await self.websocket.send_json(
+                                {
+                                    "type": "incorrect_guess",
+                                    "character": guessed_character,
+                                    "lobby": lobby.to_dict(),
+                                }
+                            )
+                            await self.connection.broadcast_lobby(
+                                {
+                                    "type": "update_lobby",
+                                    "lobby": lobby.to_dict(),
+                                },
+                                self.lobby_id,
+                            )
+                elif msg_type == "end_turn":
+                    lobby = LobbyManager.get(self.lobby_id)
+                    if lobby:
+                        lobby.switch_turn()
                         await self.connection.broadcast_lobby(
                             {
-                                "type": "character_selected",
-                                "user_id": self.user.user_id,
-                                "username": self.user.username,
-                                "character": character,
+                                "type": "end_turn",
+                                "lobby": lobby.to_dict(),
                             },
                             self.lobby_id,
                         )
-
+                elif msg_type == "kick_player":
+                    lobby = LobbyManager.get(self.lobby_id)
+                    if not lobby:
+                        continue
+                    if lobby.creator_id != self.user.user_id:
+                        await self.websocket.send_json(
+                            {
+                                "type": "kick_failed",
+                                "reason": "Only lobby creator can kick players",
+                            }
+                        )
+                        continue
+                    kick_user_id = data.get("user_id", "")
+                    if kick_user_id == self.user.user_id:
+                        continue  # Can't kick yourself
+                    if (
+                        lobby.second_player
+                        and lobby.second_player.user_id == kick_user_id
+                    ):
+                        lobby.remove_player(kick_user_id)
+                        await self.connection.broadcast_lobby(
+                            {
+                                "type": "player_kicked",
+                                "lobby": lobby.to_dict(),
+                            },
+                            self.lobby_id,
+                        )
+                        kicked_conn = self.connection.get(kick_user_id)
+                        if kicked_conn:
+                            kicked_conn.lobby_id = ""
+                            await kicked_conn.websocket.send_json(
+                                {"type": "kicked", "reason": "You were kicked from the lobby"}
+                            )
                 elif msg_type == "chat_message":
                     message = data.get("message", "").strip()
                     if message and len(message) <= 500:  # Limit message length

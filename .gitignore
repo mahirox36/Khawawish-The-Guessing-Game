@@ -4,3 +4,6 @@
 data.json
 static/images/
 __pycache__/
+db.*
+Khawawish The Guessing Game.code-workspace
+.github/

@@ -8,22 +8,26 @@ export interface User {
   created_at: string;
 }
 
+export interface Player {
+  user_id: string;
+  username: string;
+  display_name: string;
+  is_ready: boolean;
+}
+
 export interface Lobby {
   lobby_id: string;
   lobby_name: string;
   max_images: number;
   seed: string;
-  players: Record<string, {
-    username: string;
-    display_name: string;
-    is_ready: boolean;
-    score: number;
-  }>;
+  owner: Player | null
+  second_player: Player | null
   has_password: boolean;
   is_private: boolean;
   creator_id: string;
   created_at: string;
   game_started: boolean;
+  user_turn: string;
   player_count: number;
 }
 

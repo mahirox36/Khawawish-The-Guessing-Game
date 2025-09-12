@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
+import { motion } from 'framer-motion';
+
 export function Register({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     username: '',
@@ -34,69 +36,104 @@ export function Register({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
-      <div>
-        <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+    <motion.form 
+      onSubmit={handleSubmit} 
+      className="space-y-6 w-full"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="space-y-2">
+        <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Username
         </label>
-        <input
+        <motion.input
+          whileFocus={{ scale: 1.01 }}
           type="text"
           id="username"
           name="username"
           value={formData.username}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   transition-colors duration-200"
           required
         />
       </div>
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Email
         </label>
-        <input
+        <motion.input
+          whileFocus={{ scale: 1.01 }}
           type="email"
           id="email"
           name="email"
           value={formData.email}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   transition-colors duration-200"
           required
         />
       </div>
-      <div>
-        <label htmlFor="display_name" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Display Name
         </label>
-        <input
+        <motion.input
+          whileFocus={{ scale: 1.01 }}
           type="text"
           id="display_name"
           name="display_name"
           value={formData.display_name}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   transition-colors duration-200"
         />
       </div>
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+      <div className="space-y-2">
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Password
         </label>
-        <input
+        <motion.input
+          whileFocus={{ scale: 1.01 }}
           type="password"
           id="password"
           name="password"
           value={formData.password}
           onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                   bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   transition-colors duration-200"
           required
         />
       </div>
-      {error && <p className="text-red-500 text-sm">{error}</p>}
-      <button
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-200 p-3 rounded-lg text-sm"
+        >
+          {error}
+        </motion.div>
+      )}
+      <motion.button
         type="submit"
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className="w-full flex justify-center py-3 px-4 rounded-lg text-sm font-semibold text-white
+                 bg-gradient-to-r from-game-primary to-game-secondary hover:opacity-90
+                 transform transition-all duration-200
+                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary"
       >
-        Register
-      </button>
-    </form>
+        Create Account
+      </motion.button>
+    </motion.form>
   );
 }
