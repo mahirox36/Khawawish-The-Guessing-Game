@@ -19,6 +19,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
 
+  // Check if the token has expired
+  if (token) {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const isExpired = payload.exp * 1000 < Date.now();
+    if (isExpired) {  
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      delete api.defaults.headers.common['Authorization'];
+    }
+  }
+
   const handleAuthResponse = (response: AuthResponse) => {
     setUser(response.user);
     setToken(response.access_token);
