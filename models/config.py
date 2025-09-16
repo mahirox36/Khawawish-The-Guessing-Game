@@ -7,7 +7,7 @@ load_dotenv()
 # Default to SQLite if no DATABASE_URL is provided
 
 async def init_db():
-    db_url = os.getenv("DATABASE_URL")
+    db_url = os.getenv("DB_URL", "sqlite://db.sqlite3")
     await Tortoise.init(
         db_url=db_url,
         modules={"models": ["models.game", "aerich.models"]},
@@ -16,7 +16,7 @@ async def init_db():
 
 TORTOISE_ORM = {
     "connections": {
-        "default": os.getenv("DATABASE_URL"),
+        "default": os.getenv("DB_URL", "sqlite://db.sqlite3"),
     },
     "apps": {
         "models": {
