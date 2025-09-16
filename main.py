@@ -43,11 +43,11 @@ app = FastAPI(
 )
 
 load_dotenv()
-db_url = "sqlite://db.sqlite3"
+db_url = os.getenv("db_url", "sqlite://db.sqlite3")
 
 JWT_SECRET = os.getenv("JWT_SECRET", "secret")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+JWT_EXPIRATION_HOURS = 24 * 7
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -301,7 +301,12 @@ class GameLobby:
             return True
         return False
 
-    async def get_images(self):
+    async def get_images(self, isRematch: bool = False) -> List[str]:
+        self.seed = str(uuid.uuid4()) if isRematch else self.seed
+        if isRematch and self.owner and self.owner.character:
+            self.owner.character = None
+        if isRematch and self.second_player and self.second_player.character:
+            self.second_player.character = None
         random.seed(self.seed)
         return random.sample(
             static_file_names, min(self.max_characters, len(static_file_names))
@@ -401,6 +406,7 @@ class GameWebSocket:
         self.message_task: asyncio.Task | None = None
         self.lobby_id: str = ""
         self.signed_in = False
+        self.game_session : Optional[GameSession] = None
 
     async def start(self):
         """Entry point to manage WebSocket lifecycle"""
@@ -535,6 +541,7 @@ class GameWebSocket:
 
                 elif msg_type == "start_game":
                     lobby = LobbyManager.get(self.lobby_id)
+                    isRematch = data.get("isRematch", False)
                     if not lobby:
                         await self.websocket.send_json(
                             {"type": "start_failed", "reason": "Lobby not found"}
@@ -559,12 +566,12 @@ class GameWebSocket:
                         )
                         continue
 
-                    images = await lobby.get_images()
+                    images = await lobby.get_images(isRematch)
                     lobby.state["images"] = images
                     lobby.game_started = True
 
                     # Create game session in database
-                    game_session = await GameSession.create(
+                    self.game_session = await GameSession.create(
                         session_id=str(uuid.uuid4()),
                         lobby_id=lobby.lobby_id,
                         creator_id=lobby.creator_id,
@@ -577,9 +584,9 @@ class GameWebSocket:
 
                     await self.connection.broadcast_lobby(
                         {
-                            "type": "game_started",
+                            "type": "rematch_started" if isRematch else "game_started",
                             "images": images,
-                            "session_id": game_session.session_id,
+                            "session_id": self.game_session.session_id,
                         },
                         self.lobby_id,
                     )
@@ -700,6 +707,30 @@ class GameWebSocket:
                                 },
                                 self.lobby_id,
                             )
+                elif msg_type == "leave_lobby":
+                    lobby = LobbyManager.get(self.lobby_id)
+                    if lobby:
+                        lobby.remove_player(self.user.user_id)
+                        await self.connection.broadcast_lobby(
+                            {
+                                "type": "player_left_in_results",
+                                "user_id": self.user.user_id,
+                                "username": self.user.username,
+                                "lobby": lobby.to_dict(),
+                            },
+                            self.lobby_id,
+                            [self.user.user_id],
+                        )
+
+                        LobbyManager.delete_if_empty(self.lobby_id)
+                        await self.connection.broadcast(
+                            {
+                                "type": "new_lobby",
+                                "public_lobbies": LobbyManager.get_public_lobbies(),
+                                "total_lobbies": len(LobbyManager.lobbies),
+                            }
+                        )
+                        self.lobby_id = ""
 
                 else:
                     logger.warning(f"Unknown message type: {msg_type}")

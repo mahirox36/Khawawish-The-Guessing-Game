@@ -28,6 +28,9 @@ export default function App() {
   const [images, setImages] = useState<string[]>([]);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [status, setStatus] = useState<"Win" | "Lose" | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
   useEffect(() => {
     if (token) {
@@ -56,6 +59,12 @@ export default function App() {
           setCurrentLobby(message.lobby);
           setSubPage("waiting");
           setPhase("selection");
+          break;
+        case "rematch_started":
+          setImages(message.images);
+          setPhase("selection");
+          setStatus(null);
+          handleRefresh();
           break;
         case "game_started":
           setImages(message.images);
@@ -103,6 +112,13 @@ export default function App() {
         case "start_failed":
         case "join_failed":
           toast.error(message.reason || "Failed to start the game.");
+          break;
+        case "player_left_in_results":
+          toast.error("The other player has left the game.");
+          setPage("lobby");
+          setCurrentLobby(null);
+          setSubPage(null);
+          setStatus(null);
           break;
         default:
           console.warn("Unknown message type:", message.type);
@@ -169,6 +185,16 @@ export default function App() {
     ws?.send(JSON.stringify({ type: "start_game" }));
   };
 
+  const handleRematch = () => {
+    if (currentLobby?.player_count! < 2) {
+      toast.error("At least 2 players are required to start the game.");
+      return;
+    }
+    ws?.send(JSON.stringify({ type: "start_game", isRematch: true }));
+    setStatus(null);
+    setPhase("selection");
+  };
+
   const handleCharacterDiscard = (character: string) => {
     ws?.send(JSON.stringify({ type: "discard_character", character }));
   };
@@ -192,6 +218,14 @@ export default function App() {
     }
     ws?.send(JSON.stringify({ type: "end_turn" }));
     toast.success("It's now the other player's turn.");
+  };
+
+  const handleLeaveGame = () => {
+    ws?.send(JSON.stringify({ type: "leave_lobby" }));
+    setPage("lobby");
+    setCurrentLobby(null);
+    setSubPage(null);
+    setStatus(null);
   };
 
   if (page === "auth") {
@@ -426,11 +460,14 @@ export default function App() {
     <div className="min-h-screen bg-game-bg-light dark:bg-game-bg-dark">
       <DarkModeToggle />
       <Game
+        key={refreshKey}
         images={images}
         onDiscardCharacter={handleCharacterDiscard}
         onOwnCharacterSelect={handleOwnCharacterSelect}
         onGuessCharacter={handleGuessCharacter}
         onEndTurn={handleEndTurn}
+        onLeaveGame={handleLeaveGame}
+        onRematch={handleRematch}
         phase={phase}
         gameStatus={status}
         currentLobby={currentLobby}
