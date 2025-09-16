@@ -43,7 +43,7 @@ app = FastAPI(
 )
 
 load_dotenv()
-db_url = os.getenv("db_url", "sqlite://db.sqlite3")
+db_url = os.getenv("DB_URL", "sqlite://db.sqlite3")
 
 JWT_SECRET = os.getenv("JWT_SECRET", "secret")
 JWT_ALGORITHM = "HS256"
