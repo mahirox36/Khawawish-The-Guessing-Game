@@ -1,11 +1,23 @@
 export interface User {
   user_id: string;
   username: string;
-  display_name: string;
   email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
   games_played: number;
   games_won: number;
+  total_score: number;
+  best_streak: number;
+  current_streak: number;
+  in_game: boolean;
+  is_active: boolean;
+  is_verified: boolean;
   created_at: string;
+  updated_at: string;
+  last_login: string | null;
+  win_rate: number;
+  average_score: number;
 }
 
 export interface Player {
@@ -20,8 +32,8 @@ export interface Lobby {
   lobby_name: string;
   max_images: number;
   seed: string;
-  owner: Player | null
-  second_player: Player | null
+  owner: Player | null;
+  second_player: Player | null;
   has_password: boolean;
   is_private: boolean;
   creator_id: string;
@@ -35,4 +47,9 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   user: User;
+}
+
+export interface LoginError {
+  status: number;
+  detail: string;
 }

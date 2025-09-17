@@ -1,10 +1,23 @@
-import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { LoginError } from "../types";
 
-export function Login({ onSuccess }: { onSuccess: () => void }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+interface LoginProps {
+  onSuccess: () => void;
+  username: string;
+  setUsername: (username: string) => void;
+  password: string;
+  setPassword: (password: string) => void;
+}
+
+export function Login({
+  onSuccess,
+  username,
+  setUsername,
+  password,
+  setPassword,
+}: LoginProps) {
+  const [error, setError] = useState("");
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -12,15 +25,23 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
     try {
       await login(username, password);
       onSuccess();
-    } catch (err) {
-      setError('Login failed. Please check your credentials.');
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "detail" in err) {
+        const loginError = err as LoginError;
+        setError(`Login failed. ${loginError.detail}`);
+        return;
+      }
+      setError("Login failed. Please check your credentials.");
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 w-full">
       <div className="space-y-2">
-        <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label
+          htmlFor="username"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
           Username
         </label>
         <input
@@ -36,7 +57,10 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
       <div className="space-y-2">
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label
+          htmlFor="password"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
           Password
         </label>
         <input

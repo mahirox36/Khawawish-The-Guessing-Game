@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Lock, Users, Image } from 'lucide-react';
 
 interface CreateLobbyProps {
+  in_game?: boolean;
   onCreateLobby: (data: {
     maxImages: number;
     lobbyName: string;
@@ -11,7 +12,7 @@ interface CreateLobbyProps {
   }) => void;
 }
 
-export function CreateLobby({ onCreateLobby }: CreateLobbyProps) {
+export function CreateLobby({ in_game, onCreateLobby }: CreateLobbyProps) {
   const [maxImages, setMaxImages] = useState(25);
   const [lobbyName, setLobbyName] = useState('');
   const [password, setPassword] = useState('');
@@ -42,7 +43,7 @@ export function CreateLobby({ onCreateLobby }: CreateLobbyProps) {
           Lobby Name
         </label>
         <div className="relative">
-          <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={20} />
           <motion.input
             whileFocus={{ scale: 1.01 }}
             type="text"
@@ -63,7 +64,7 @@ export function CreateLobby({ onCreateLobby }: CreateLobbyProps) {
           Number of Characters
         </label>
         <div className="relative">
-          <Image className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <Image className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={20} />
           <motion.input
             whileFocus={{ scale: 1.01 }}
             type="number"
@@ -86,7 +87,7 @@ export function CreateLobby({ onCreateLobby }: CreateLobbyProps) {
           Password (optional)
         </label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={20} />
           <motion.input
             whileFocus={{ scale: 1.01 }}
             type="text"
@@ -125,8 +126,9 @@ export function CreateLobby({ onCreateLobby }: CreateLobbyProps) {
         whileTap={{ scale: 0.98 }}
         className="w-full flex justify-center py-3 px-4 rounded-lg text-sm font-semibold text-white
                  bg-gradient-to-r from-game-primary to-game-secondary hover:opacity-90
-                 transform transition-all duration-200
-                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary"
+                 transform transition-all duration-200 hover:cursor-pointer
+                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={in_game}
       >
         Create Lobby
       </motion.button>

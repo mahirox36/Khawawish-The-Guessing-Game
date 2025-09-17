@@ -1,8 +1,30 @@
 from enum import StrEnum
+from typing import Optional, overload, Union
+from pydantic import BaseModel
 from tortoise.models import Model
 from tortoise import fields
 from datetime import datetime
 
+class UserResponse(BaseModel):
+    user_id: str
+    username: str
+    email: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    games_played: int = 0
+    games_won: int = 0
+    total_score: int = 0
+    best_streak: int = 0
+    current_streak: int = 0
+    in_game: bool = False
+    is_active: bool = True
+    is_verified: bool = False
+    created_at: datetime
+    updated_at: datetime
+    last_login: Optional[datetime] = None
+    win_rate: float
+    average_score: float
 
 class User(Model):
     """User model for authentication and game statistics"""
@@ -23,6 +45,7 @@ class User(Model):
     total_score = fields.IntField(default=0)
     best_streak = fields.IntField(default=0)
     current_streak = fields.IntField(default=0)
+    in_game = fields.BooleanField(default=False)
 
     # Account status
     is_active = fields.BooleanField(default=True)
@@ -36,6 +59,37 @@ class User(Model):
 
     def __str__(self):
         return f"User({self.username})"
+    
+    @overload
+    def export_data(self, to_dict: bool = False) -> UserResponse: ...
+    @overload
+    def export_data(self, to_dict: bool = True) -> dict: ...
+    
+    def export_data(self, to_dict: bool = False) -> Union[UserResponse, dict]:
+        data = UserResponse(
+            user_id=self.user_id,
+            username=self.username,
+            email=self.email,
+            display_name=self.display_name,
+            avatar_url=self.avatar_url,
+            bio=self.bio,
+            games_played=self.games_played,
+            games_won=self.games_won,
+            total_score=self.total_score,
+            best_streak=self.best_streak,
+            current_streak=self.current_streak,
+            in_game=self.in_game,
+            is_active=self.is_active,
+            is_verified=self.is_verified,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            last_login=self.last_login,
+            win_rate=self.win_rate,
+            average_score=self.average_score,
+        )
+        if to_dict:
+            return data.model_dump()
+        return data
 
     @property
     def win_rate(self) -> float:
@@ -73,7 +127,7 @@ class GameSession(Model):
     )  # Store game settings like max_images, seed, etc.
 
     # Game state
-    status = fields.CharEnumField(enum_type=GameSessionStatus, default="waiting")
+    status = fields.CharEnumField(enum_type=GameSessionStatus, default="in_progress")
     started_at = fields.DatetimeField(null=True)
     ended_at = fields.DatetimeField(null=True)
     winner_id = fields.CharField(max_length=50, null=True)

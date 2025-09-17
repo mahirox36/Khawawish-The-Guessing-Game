@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { User, AuthResponse } from '../types';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { User, AuthResponse, LoginError } from '../types';
 import { api } from '../api';
 
 interface AuthContextType {
@@ -32,6 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  useEffect(() => {
+    (async () => {
+    const user_me = await api.get('/auth/me')
+    setUser(user_me.data)
+  })();
+  }, []);
+
   const handleAuthResponse = (response: AuthResponse) => {
     setUser(response.user);
     setToken(response.access_token);
@@ -44,8 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await api.post<AuthResponse>('/auth/login', { username, password });
       handleAuthResponse(response.data);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Login failed:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const err = error as { response: { status: number; data: { detail: string } } };
+        throw { status: err.response.status, detail: err.response.data.detail } as LoginError;
+      }
       throw error;
     }
   };
@@ -61,6 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       handleAuthResponse(response.data);
     } catch (error) {
       console.error('Registration failed:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const err = error as { response: { status: number; data: { detail: string } } };
+        throw { status: err.response.status, detail: err.response.data.detail } as LoginError;
+      }
       throw error;
     }
   };

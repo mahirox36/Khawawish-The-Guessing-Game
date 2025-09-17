@@ -1,16 +1,30 @@
-import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 
-export function Register({ onSuccess }: { onSuccess: () => void }) {
+interface RegisterProps {
+  onSuccess: () => void;
+  username: string;
+  setUsername: (username: string) => void;
+  password: string;
+  setPassword: (password: string) => void;
+}
+
+export function Register({
+  onSuccess,
+  username,
+  setUsername,
+  password,
+  setPassword,
+}: RegisterProps) {
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    display_name: ''
+    username: username,
+    email: "",
+    password: password,
+    display_name: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,27 +38,41 @@ export function Register({ onSuccess }: { onSuccess: () => void }) {
       );
       onSuccess();
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      if (err && typeof err === "object" && "detail" in err) {
+        const regError = err as { detail: string };
+        setError(`Registration failed. ${regError.detail}`);
+        return;
+      }
+      setError("Registration failed. Please try again.");
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
+    if (e.target.name === "username") {
+      setUsername(e.target.value);
+    }
+    if (e.target.name === "password") {
+      setPassword(e.target.value);
+    }
   };
 
   return (
-    <motion.form 
-      onSubmit={handleSubmit} 
+    <motion.form
+      onSubmit={handleSubmit}
       className="space-y-6 w-full"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <div className="space-y-2">
-        <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label
+          htmlFor="username"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
           Username
         </label>
         <motion.input
@@ -62,7 +90,10 @@ export function Register({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
       <div className="space-y-2">
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label
+          htmlFor="email"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
           Email
         </label>
         <motion.input
@@ -80,7 +111,10 @@ export function Register({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
       <div className="space-y-2">
-        <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label
+          htmlFor="display_name"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
           Display Name
         </label>
         <motion.input
@@ -97,7 +131,10 @@ export function Register({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
       <div className="space-y-2">
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label
+          htmlFor="password"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+        >
           Password
         </label>
         <motion.input
@@ -115,7 +152,7 @@ export function Register({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
       {error && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-200 p-3 rounded-lg text-sm"

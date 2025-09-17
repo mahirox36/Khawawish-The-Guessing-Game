@@ -30,6 +30,11 @@ export default function App() {
   const [status, setStatus] = useState<"Win" | "Lose" | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [connectedError, setConnectedError] = useState<boolean>(false);
+
   const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
   useEffect(() => {
@@ -37,22 +42,22 @@ export default function App() {
       fetchLobbies();
       setPage("lobby");
     }
-    if (!token) return;
+    if (!token || ws) return;
+    
+    const current_ws = new WebSocket(`${baseUrl}/ws/game?token=${token}`);
+    setWs(current_ws);
 
-    const ws = new WebSocket(`${baseUrl}/ws/game?token=${token}`);
-    setWs(ws);
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "sign" }));
+    current_ws.onopen = () => {
+      current_ws.send(JSON.stringify({ type: "sign" }));
     };
 
-    ws.onmessage = (event) => {
+    current_ws.onmessage = (event) => {
       const message = JSON.parse(event.data.toString());
       console.log("Received message:", message);
 
       switch (message.type) {
         case "ping":
-          ws.send(JSON.stringify({ type: "pong" }));
+          current_ws.send(JSON.stringify({ type: "pong" }));
           break;
         case "lobby_created":
         case "lobby_joined":
@@ -120,17 +125,27 @@ export default function App() {
           setSubPage(null);
           setStatus(null);
           break;
+        case "connected_error":
+          toast.error(message.message || "Connection error.");
+          setConnectedError(true);
+          break;
         default:
           console.warn("Unknown message type:", message.type);
       }
     };
 
-    ws.onerror = (error) => {
+    current_ws.onerror = (error) => {
       console.error("WebSocket error:", error);
     };
 
+    current_ws.onclose = () => {
+      console.log("WebSocket connection closed");
+      
+      // setWs(null);
+    };
+
     return () => {
-      if (ws) ws.close();
+      if (current_ws) current_ws.close();
     };
   }, [token]);
 
@@ -220,6 +235,13 @@ export default function App() {
     toast.success("It's now the other player's turn.");
   };
 
+  const handleLeaveGameInResults = () => {
+    ws?.send(JSON.stringify({ type: "leave_lobby", in_result: true }));
+    setPage("lobby");
+    setCurrentLobby(null);
+    setSubPage(null);
+    setStatus(null);
+  };
   const handleLeaveGame = () => {
     ws?.send(JSON.stringify({ type: "leave_lobby" }));
     setPage("lobby");
@@ -299,9 +321,21 @@ export default function App() {
                 transition={{ duration: 0.2 }}
               >
                 {authMode === "login" ? (
-                  <Login onSuccess={handleAuthSuccess} />
+                  <Login
+                    onSuccess={handleAuthSuccess}
+                    username={username}
+                    setUsername={setUsername}
+                    password={password}
+                    setPassword={setPassword}
+                  />
                 ) : (
-                  <Register onSuccess={handleAuthSuccess} />
+                  <Register
+                    onSuccess={handleAuthSuccess}
+                    username={username}
+                    setUsername={setUsername}
+                    password={password}
+                    setPassword={setPassword}
+                  />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -326,7 +360,7 @@ export default function App() {
               animate={{ x: 0 }}
               className="text-3xl font-bold text-gradient"
             >
-              Game Lobby
+              Khawawish: The Guessing Game
             </motion.h1>
             <motion.div
               initial={{ x: 20 }}
@@ -409,7 +443,8 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="flex space-x-4">
+                <div className="flex justify-between">
+                  <div className="flex space-x-4">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -428,6 +463,15 @@ export default function App() {
                       Start Game
                     </motion.button>
                   )}
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleLeaveGame}
+                    className="px-6 py-3 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                  >
+                    Leave Lobby
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
@@ -439,7 +483,7 @@ export default function App() {
                 transition={{ delay: 0.2 }}
                 className="bg-game-surface-light dark:bg-game-surface-dark p-8 rounded-xl shadow-xl"
               >
-                <CreateLobby onCreateLobby={handleCreateLobby} />
+                <CreateLobby in_game={user?.in_game || connectedError} onCreateLobby={handleCreateLobby} />
               </motion.div>
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -447,7 +491,7 @@ export default function App() {
                 transition={{ delay: 0.3 }}
                 className="bg-game-surface-light dark:bg-game-surface-dark p-8 rounded-xl shadow-xl"
               >
-                <LobbyList lobbies={lobbies} onJoinLobby={handleJoinLobby} />
+                <LobbyList in_game={user?.in_game || connectedError} lobbies={lobbies} onJoinLobby={handleJoinLobby} />
               </motion.div>
             </div>
           )}
@@ -466,7 +510,7 @@ export default function App() {
         onOwnCharacterSelect={handleOwnCharacterSelect}
         onGuessCharacter={handleGuessCharacter}
         onEndTurn={handleEndTurn}
-        onLeaveGame={handleLeaveGame}
+        onLeaveGame={handleLeaveGameInResults}
         onRematch={handleRematch}
         phase={phase}
         gameStatus={status}

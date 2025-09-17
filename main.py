@@ -23,7 +23,7 @@ from typing import List, Union, Optional
 import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from models.game import User, GameSession
+from models.game import GameSessionStatus, User, GameSession, UserResponse
 
 # Set up logging
 logging.basicConfig(
@@ -95,16 +95,6 @@ class UserLogin(BaseModel):
     password: str
 
 
-class UserResponse(BaseModel):
-    user_id: str
-    username: str
-    display_name: str
-    email: str
-    games_played: int
-    games_won: int
-    created_at: datetime
-
-
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
@@ -164,9 +154,7 @@ async def get_current_user(
 
 
 class ConnectionManager:
-    def __init__(self):
-        # maps userID -> GameWebSocket
-        self.connections: dict[str, "GameWebSocket"] = {}
+    connections: dict[str, "GameWebSocket"] = {}
 
     def add(self, user_id: str, ws: "GameWebSocket"):
         self.connections[user_id] = ws
@@ -174,8 +162,9 @@ class ConnectionManager:
     def remove(self, user_id: str):
         self.connections.pop(user_id, None)
 
-    def get(self, user_id: str) -> Union["GameWebSocket", None]:
-        return self.connections.get(user_id)
+    @classmethod
+    def get(cls, user_id: str) -> Union["GameWebSocket", None]:
+        return cls.connections.get(user_id)
 
     async def broadcast_lobby(self, message: dict, lobby: str, exclude: List[str] = []):
         """Send a message to all connections (optionally excluding some)"""
@@ -251,6 +240,13 @@ class GameLobby:
             self.user_turn = self.second_player.user_id
         else:
             self.user_turn = self.owner.user_id
+
+    def get_other_player_id(self, user_id: str) -> Optional[str]:
+        if self.owner and self.owner.user_id == user_id:
+            return self.second_player.user_id if self.second_player else None
+        elif self.second_player and self.second_player.user_id == user_id:
+            return self.owner.user_id if self.owner else None
+        return None
 
     def add_second_player(self, user_id: str, username: str, display_name: str):
         if not self.second_player:
@@ -406,7 +402,7 @@ class GameWebSocket:
         self.message_task: asyncio.Task | None = None
         self.lobby_id: str = ""
         self.signed_in = False
-        self.game_session : Optional[GameSession] = None
+        self.game_session: Optional[GameSession] = None
 
     async def start(self):
         """Entry point to manage WebSocket lifecycle"""
@@ -476,6 +472,8 @@ class GameWebSocket:
                             "total_lobbies": len(LobbyManager.lobbies),
                         }
                     )
+                    self.user.in_game = True
+                    await self.user.save(update_fields=["in_game"])
 
                 elif msg_type == "join_lobby":
                     lobby_id: str = data.get("lobby_id", "")
@@ -522,6 +520,8 @@ class GameWebSocket:
                     await self.websocket.send_json(
                         {"type": "lobby_joined", "lobby": lobby.to_dict()}
                     )
+                    self.user.in_game = True
+                    await self.user.save(update_fields=["in_game"])
 
                 elif msg_type == "ready":
                     lobby = LobbyManager.get(self.lobby_id)
@@ -581,6 +581,15 @@ class GameWebSocket:
                             "seed": lobby.seed,
                         },
                     )
+                    for p in [lobby.owner, lobby.second_player]:
+                        if not p:
+                            continue
+                        user = await User.get_or_none(user_id=p.user_id)
+                        logger.info(user)
+                        if not user:
+                            continue
+                        user.games_played += 1
+                        await user.save(update_fields=["games_played"])
 
                     await self.connection.broadcast_lobby(
                         {
@@ -609,7 +618,7 @@ class GameWebSocket:
                     lobby = LobbyManager.get(self.lobby_id)
                     if lobby and guessed_character:
                         if lobby.guess_character(self.user.user_id, guessed_character):
-                            lobby.switch_turn()
+                            # lobby.switch_turn()
                             await self.websocket.send_json(
                                 {
                                     "type": "correct_guess",
@@ -631,6 +640,38 @@ class GameWebSocket:
                                 self.lobby_id,
                                 [self.user.user_id],
                             )
+                            # Update user stats
+                            self.user.games_won += 1
+                            self.user.total_score += 1
+                            self.user.current_streak += 1
+                            if self.user.current_streak > self.user.best_streak:
+                                self.user.best_streak = self.user.current_streak
+                            await self.user.save(
+                                update_fields=[
+                                    "games_won",
+                                    "total_score",
+                                    "current_streak",
+                                    "best_streak",
+                                ]
+                            )
+                            other_player_id = lobby.get_other_player_id(
+                                self.user.user_id
+                            )
+                            if other_player_id:
+                                other_user = await User.get_or_none(
+                                    user_id=other_player_id
+                                )
+                                if other_user:
+                                    other_user.current_streak = 0
+                                    await other_user.save(update_fields=["current_streak"])
+
+                            # End game session
+                            if self.game_session:
+                                self.game_session.ended_at = utcnow()
+                                self.game_session.winner_id = self.user.user_id
+                                self.game_session.status = GameSessionStatus.COMPLETED
+                                await self.game_session.save()
+                                self.game_session = None
                         else:
                             lobby.switch_turn()
                             await self.websocket.send_json(
@@ -689,8 +730,15 @@ class GameWebSocket:
                         if kicked_conn:
                             kicked_conn.lobby_id = ""
                             await kicked_conn.websocket.send_json(
-                                {"type": "kicked", "reason": "You were kicked from the lobby"}
+                                {
+                                    "type": "kicked",
+                                    "reason": "You were kicked from the lobby",
+                                }
                             )
+                        user = await User.get_or_none(user_id=kick_user_id)
+                        if user:
+                            user.in_game = False
+                            await user.save(update_fields=["in_game"])
                 elif msg_type == "chat_message":
                     message = data.get("message", "").strip()
                     if message and len(message) <= 500:  # Limit message length
@@ -709,11 +757,12 @@ class GameWebSocket:
                             )
                 elif msg_type == "leave_lobby":
                     lobby = LobbyManager.get(self.lobby_id)
+                    in_result = data.get("in_result", False)
                     if lobby:
                         lobby.remove_player(self.user.user_id)
                         await self.connection.broadcast_lobby(
                             {
-                                "type": "player_left_in_results",
+                                "type": f"player_left{"_in_results" if in_result else ""}",
                                 "user_id": self.user.user_id,
                                 "username": self.user.username,
                                 "lobby": lobby.to_dict(),
@@ -731,6 +780,8 @@ class GameWebSocket:
                             }
                         )
                         self.lobby_id = ""
+                        self.user.in_game = False
+                        await self.user.save(update_fields=["in_game"])
 
                 else:
                     logger.warning(f"Unknown message type: {msg_type}")
@@ -753,6 +804,8 @@ class GameWebSocket:
         try:
             lobby = LobbyManager.get(self.lobby_id)
             if lobby:
+                self.user.in_game = False
+                await self.user.save(update_fields=["in_game"])
                 lobby.remove_player(self.user.user_id)
                 await self.connection.broadcast_lobby(
                     {
@@ -785,7 +838,7 @@ class GameWebSocket:
 async def register_user(user_data: UserRegister):
     try:
         # Check if username or email already exists
-        existing_user = await User.get_or_none(username=user_data.username)
+        existing_user = await User.get_or_none(username=user_data.username.lower())
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -802,10 +855,10 @@ async def register_user(user_data: UserRegister):
         hashed_password = hash_password(user_data.password)
         user = await User.create(
             user_id=str(uuid.uuid4()),
-            username=user_data.username,
+            username=user_data.username.lower(),
             email=user_data.email,
             password_hash=hashed_password,
-            display_name=user_data.display_name or user_data.username,
+            display_name=user_data.display_name or user_data.username.capitalize(),
         )
 
         # Create access token
@@ -814,15 +867,7 @@ async def register_user(user_data: UserRegister):
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
-            user=UserResponse(
-                user_id=user.user_id,
-                username=user.username,
-                display_name=user.display_name,
-                email=user.email,
-                games_played=user.games_played,
-                games_won=user.games_won,
-                created_at=user.created_at,
-            ),
+            user=user.export_data(),
         )
 
     except IntegrityError:
@@ -833,7 +878,7 @@ async def register_user(user_data: UserRegister):
 
 @api.post("/auth/login", response_model=TokenResponse)
 async def login_user(user_data: UserLogin):
-    user = await User.get_or_none(username=user_data.username)
+    user = await User.get_or_none(username=user_data.username.lower())
     if not user or not verify_password(user_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -842,36 +887,20 @@ async def login_user(user_data: UserLogin):
 
     # Update last login
     user.last_login = utcnow()
-    await user.save()
+    await user.save(update_fields=["last_login"])
 
     access_token = create_access_token(data={"sub": user.user_id})
 
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse(
-            user_id=user.user_id,
-            username=user.username,
-            display_name=user.display_name,
-            email=user.email,
-            games_played=user.games_played,
-            games_won=user.games_won,
-            created_at=user.created_at,
-        ),
+        user=user.export_data(),
     )
 
 
 @api.get("/auth/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return UserResponse(
-        user_id=current_user.user_id,
-        username=current_user.username,
-        display_name=current_user.display_name,
-        email=current_user.email,
-        games_played=current_user.games_played,
-        games_won=current_user.games_won,
-        created_at=current_user.created_at,
-    )
+    return current_user.export_data()
 
 
 # Lobby endpoints
@@ -893,15 +922,7 @@ async def get_user_stats(current_user: User = Depends(get_current_user)):
     )
 
     return {
-        "user": UserResponse(
-            user_id=current_user.user_id,
-            username=current_user.username,
-            display_name=current_user.display_name,
-            email=current_user.email,
-            games_played=current_user.games_played,
-            games_won=current_user.games_won,
-            created_at=current_user.created_at,
-        ),
+        "user": current_user.export_data(),
         "total_users": total_users,
         "recent_games": [
             {
@@ -923,19 +944,37 @@ async def websocket_game(websocket: WebSocket, token: str):
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
+            )
             return
 
         user = await User.get_or_none(user_id=user_id)
         if user is None:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="User not found"
+            )
             return
-
+        connection = ConnectionManager.get(user.user_id)
+        if connection:
+            await websocket.accept()
+            await websocket.send_json(
+                {
+                    "type": "connected_error",
+                    "message": "User already connected in another session.",
+                }
+            )
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION, reason="User already connected"
+            )
+            return
         handler = GameWebSocket(websocket, user)
         await handler.start()
 
     except jwt.PyJWTError:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
+        )
 
 
 app.include_router(api)
