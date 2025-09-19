@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { baseUrl } from "../api";
 import { Lobby } from "../types";
 import { useAuth } from "../contexts/AuthContext";
+import NextImage from "next/image";
 
 interface GameProps {
   images: string[];
@@ -140,7 +141,7 @@ export function Game({
 
           {ownImage && (
             <motion.div
-              className="mt-4 p-3 rounded-lg bg-surfacel-500 dark:bg-surfaced-500 shadow-md group"
+              className="mt-4 p-3 rounded-lg bg-surfacel-500 dark:bg-surfaced-500 shadow-md group md:hidden"
               whileHover={{ scale: 1.02 }}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -149,10 +150,11 @@ export function Game({
                 Your Character
               </h3>
               <div className="relative aspect-square rounded-md overflow-hidden">
-                <img
+                <NextImage
                   src={`${baseUrl}/static/images/${ownImage}`}
                   alt="Your character"
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                  fill
                 />
               </div>
             </motion.div>
@@ -196,11 +198,11 @@ export function Game({
                   }`}
                 onClick={() => handleClick(index, img)}
               >
-                <img
+                <NextImage
                   src={`${baseUrl}/static/images/${img}`}
                   alt={`Character ${index + 1}`}
                   className="w-full h-full object-contain"
-                  loading="lazy"
+                  fill
                 />
                 {selectedIndexes.includes(index.toString()) && (
                   <motion.div

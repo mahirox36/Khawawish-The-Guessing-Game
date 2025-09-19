@@ -29,6 +29,7 @@ export function DarkModeToggle() {
 
     darkModeMediaQuery.addEventListener("change", handleChange);
     return () => darkModeMediaQuery.removeEventListener("change", handleChange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateTheme = (dark: boolean, performance: boolean) => {

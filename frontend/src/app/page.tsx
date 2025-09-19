@@ -59,7 +59,6 @@ export default function App() {
     }
   }, [pathname, router, searchParams, verified]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (token) {
       fetchLobbies();
@@ -170,6 +169,7 @@ export default function App() {
     return () => {
       if (current_ws) current_ws.close();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchLobbies = async () => {
@@ -216,6 +216,7 @@ export default function App() {
   };
 
   const handleStartGame = () => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
     if (currentLobby?.player_count! < 2) {
       toast.error("At least 2 players are required to start the game.");
       return;
@@ -224,6 +225,7 @@ export default function App() {
   };
 
   const handleRematch = () => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
     if (currentLobby?.player_count! < 2) {
       toast.error("At least 2 players are required to start the game.");
       return;
