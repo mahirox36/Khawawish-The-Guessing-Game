@@ -29,7 +29,9 @@ export default function App() {
   );
 
   useEffect(() => {
-    setVerified(searchParams.get("verified"));
+    if (typeof window !== "undefined") {
+      setVerified(searchParams.get("verified"));
+    }
   }, [searchParams]);
 
   const [phase, setPhase] = useState<"selection" | "guessing" | "results">(
@@ -173,7 +175,7 @@ export default function App() {
     return () => {
       if (current_ws) current_ws.close();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchLobbies = async () => {
