@@ -7,12 +7,14 @@ export interface User {
   bio: string | null;
   games_played: number;
   games_won: number;
+  games_lose: number;
   total_score: number;
   best_streak: number;
   current_streak: number;
   in_game: boolean;
   is_active: boolean;
   is_verified: boolean;
+  toast_user: boolean;
   created_at: string;
   updated_at: string;
   last_login: string | null;

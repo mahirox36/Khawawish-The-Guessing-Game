@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     in_game: bool = False
     is_active: bool = True
     is_verified: bool = False
+    toast_user: bool = True
     created_at: datetime
     updated_at: datetime
     last_login: Optional[datetime] = None
@@ -54,6 +55,7 @@ class User(Model):
     # Account status
     is_active = fields.BooleanField(default=True)
     is_verified = fields.BooleanField(default=False)
+    toast_user = fields.BooleanField(default=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     last_login = fields.DatetimeField(null=True)
@@ -87,6 +89,7 @@ class User(Model):
             in_game=self.in_game,
             is_active=self.is_active,
             is_verified=self.is_verified,
+            toast_user=self.toast_user,
             created_at=self.created_at,
             updated_at=self.updated_at,
             last_login=self.last_login,

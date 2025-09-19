@@ -982,7 +982,11 @@ async def verify(email: str, token: str):
 
 @api.get("/auth/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return current_user.export_data()
+    data = current_user.export_data()
+    if current_user.is_verified and current_user.toast_user:
+        current_user.toast_user = False
+        await current_user.save(update_fields=["toast_user"])
+    return data
 
 
 # Lobby endpoints

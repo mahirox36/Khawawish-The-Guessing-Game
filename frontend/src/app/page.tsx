@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Login } from "@/components/Login";
@@ -18,21 +17,11 @@ import { Crown } from "lucide-react";
 
 export default function App() {
   const { user, token, logout } = useAuth();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [verified, setVerified] = useState<string | null>(null);
-  const pathname = usePathname();
   const [page, setPage] = useState<"auth" | "lobby" | "game">("auth");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [subPage, setSubPage] = useState<"list" | "create" | "waiting" | null>(
     null
   );
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setVerified(searchParams.get("verified"));
-    }
-  }, [searchParams]);
 
   const [phase, setPhase] = useState<"selection" | "guessing" | "results">(
     "selection"
@@ -51,21 +40,13 @@ export default function App() {
 
   const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
-  useEffect(() => {
-    if (verified !== null) {
-      if (verified == "true") {
-        toast.success("Your email has been verified");
-      } else {
-        toast.error("Your email couldn't be verified");
-      }
+  // toast.success("Your email has been verified");
+  // toast.error("Your email couldn't be verified");
 
-      const params = new URLSearchParams(searchParams);
-      params.delete("verified");
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  useEffect(() => {
+    if (user?.toast_user && user?.is_verified) {
+      toast.success("Your email has been verified");
     }
-  }, [pathname, router, searchParams, verified]);
-
-  useEffect(() => {
     if (token) {
       fetchLobbies();
       setPage("lobby");
