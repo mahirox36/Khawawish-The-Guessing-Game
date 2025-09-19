@@ -57,6 +57,10 @@ export default function App() {
       params.delete("verified");
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
+  }, [pathname, router, searchParams, verified]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (token) {
       fetchLobbies();
       setPage("lobby");
