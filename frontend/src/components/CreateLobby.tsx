@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Users, Image } from 'lucide-react';
+import { Lock, Users, ImageIcon } from 'lucide-react';
 
 interface CreateLobbyProps {
   in_game?: boolean;
@@ -64,7 +64,7 @@ export function CreateLobby({ in_game, onCreateLobby }: CreateLobbyProps) {
           Number of Characters
         </label>
         <div className="relative">
-          <Image className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={20} />
+          <ImageIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={20} />
           <motion.input
             whileFocus={{ scale: 1.01 }}
             type="number"

@@ -1,6 +1,6 @@
 import { Lobby } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Users, Image } from 'lucide-react';
+import { Lock, Users, ImageIcon } from 'lucide-react';
 
 interface LobbyListProps {
   in_game?: boolean;
@@ -38,7 +38,7 @@ export function LobbyList({ in_game, lobbies, onJoinLobby }: LobbyListProps) {
                           <span>{lobby.player_count}/2 Players</span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <Image size={16} />
+                          <ImageIcon size={16} />
                           <span>{lobby.max_images} Characters</span>
                         </div>
                       </div>
