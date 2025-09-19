@@ -5,6 +5,7 @@ from tortoise.models import Model
 from tortoise import fields
 from datetime import datetime
 
+
 class UserResponse(BaseModel):
     user_id: str
     username: str
@@ -14,6 +15,7 @@ class UserResponse(BaseModel):
     bio: Optional[str] = None
     games_played: int = 0
     games_won: int = 0
+    games_lose: int = 0
     total_score: int = 0
     best_streak: int = 0
     current_streak: int = 0
@@ -25,6 +27,7 @@ class UserResponse(BaseModel):
     last_login: Optional[datetime] = None
     win_rate: float
     average_score: float
+
 
 class User(Model):
     """User model for authentication and game statistics"""
@@ -42,6 +45,7 @@ class User(Model):
     # Game statistics
     games_played = fields.IntField(default=0)
     games_won = fields.IntField(default=0)
+    games_lose = fields.IntField(default=0)
     total_score = fields.IntField(default=0)
     best_streak = fields.IntField(default=0)
     current_streak = fields.IntField(default=0)
@@ -53,18 +57,19 @@ class User(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     last_login = fields.DatetimeField(null=True)
+    email_token = fields.CharField(max_length=250, null=True)
 
     class Meta:
         table = "users"
 
     def __str__(self):
         return f"User({self.username})"
-    
+
     @overload
     def export_data(self, to_dict: bool = False) -> UserResponse: ...
     @overload
     def export_data(self, to_dict: bool = True) -> dict: ...
-    
+
     def export_data(self, to_dict: bool = False) -> Union[UserResponse, dict]:
         data = UserResponse(
             user_id=self.user_id,
@@ -75,6 +80,7 @@ class User(Model):
             bio=self.bio,
             games_played=self.games_played,
             games_won=self.games_won,
+            games_lose=self.games_lose,
             total_score=self.total_score,
             best_streak=self.best_streak,
             current_streak=self.current_streak,
@@ -95,13 +101,13 @@ class User(Model):
     def win_rate(self) -> float:
         if self.games_played == 0:
             return 0.0
-        return (self.games_won / self.games_played) * 100
+        return (self.games_won / self.games_lose) * 100
 
     @property
     def average_score(self) -> float:
         if self.games_played == 0:
             return 0.0
-        return self.total_score / self.games_played
+        return self.total_score / (self.games_lose + self.games_won)
 
 
 class GameSessionStatus(StrEnum):

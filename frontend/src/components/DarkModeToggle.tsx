@@ -1,29 +1,37 @@
+"use client";
+
 import { Moon, Sun, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 
 export function DarkModeToggle() {
-  const [isDark, setIsDark] = useState(
-    document.documentElement.classList.contains("dark")
-  );
-  const [performance, setPerformance] = useState<boolean>(
-    localStorage.performance === "true"
-  );
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true; // SSR safe
+    return localStorage.theme === "dark";
+  });
+  const [performance, setPerformance] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.performance === "true"
+  });
 
+  const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
+    setMounted(true);
+    updateTheme(isDark, performance);
     const darkModeMediaQuery = window.matchMedia(
       "(prefers-color-scheme: dark)"
     );
     const handleChange = (e: MediaQueryListEvent) => {
       setIsDark(e.matches);
-      updateTheme(e.matches);
+      updateTheme(e.matches, performance);
     };
 
     darkModeMediaQuery.addEventListener("change", handleChange);
     return () => darkModeMediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  const updateTheme = (dark: boolean) => {
+  const updateTheme = (dark: boolean, performance: boolean) => {
     if (dark) {
       document.documentElement.classList.add("dark");
       localStorage.theme = "dark";
@@ -31,11 +39,17 @@ export function DarkModeToggle() {
       document.documentElement.classList.remove("dark");
       localStorage.theme = "light";
     }
+    if (performance){
+      localStorage.performance = "true"
+    } else {
+      localStorage.performance = "false"
+    }
+
   };
 
   const toggleDarkMode = () => {
     setIsDark(!isDark);
-    updateTheme(!isDark);
+    updateTheme(!isDark, performance);
   };
 
   const togglePerformance = () => {
@@ -45,11 +59,13 @@ export function DarkModeToggle() {
     });
   };
 
+  if (!mounted) return null;
+
   return (
     <div className="fixed top-4 right-4 flex flex-col gap-2">
       <motion.button
         onClick={toggleDarkMode}
-        className="p-2 rounded-full bg-game-surface-light dark:bg-game-surface-dark 
+        className="p-2 rounded-full bg-surfacel-500 dark:bg-surfaced-500 
                   shadow-lg hover:shadow-xl transition-shadow duration-300"
         whileTap={{ scale: 0.95 }}
         whileHover={{ scale: 1.05 }}
@@ -61,15 +77,15 @@ export function DarkModeToggle() {
           transition={{ duration: 0.5 }}
         >
           {isDark ? (
-            <Moon className="w-6 h-6 text-game-accent" />
+            <Moon className="w-6 h-6 text-accent-500" />
           ) : (
-            <Sun className="w-6 h-6 text-game-primary" />
+            <Sun className="w-6 h-6 text-primary-500" />
           )}
         </motion.div>
       </motion.button>
       <motion.button
         onClick={togglePerformance}
-        className="p-2 rounded-full bg-game-surface-light dark:bg-game-surface-dark 
+        className="p-2 rounded-full bg-surfacel-500 dark:bg-surfaced-500 
                   shadow-lg hover:shadow-xl transition-shadow duration-300"
         whileTap={{ scale: 0.95 }}
         whileHover={{ scale: 1.05 }}
@@ -81,9 +97,9 @@ export function DarkModeToggle() {
           transition={{ duration: 0.5 }}
         >
           {performance ? (
-            <Sparkles className="w-6 h-6 text-game-accent" />
+            <Sparkles className="w-6 h-6 text-accent-500" />
           ) : (
-            <Sparkles className="w-6 h-6 text-game-primary" />
+            <Sparkles className="w-6 h-6 text-primary-500" />
           )}
         </motion.div>
       </motion.button>

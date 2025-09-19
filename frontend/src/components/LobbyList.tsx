@@ -45,16 +45,16 @@ export function LobbyList({ in_game, lobbies, onJoinLobby }: LobbyListProps) {
                     </div>
                     <div className="flex items-center space-x-3">
                       {lobby.has_password && (
-                        <Lock className="text-game-accent" size={20} />
+                        <Lock className="text-accent-500" size={20} />
                       )}
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => onJoinLobby(lobby.lobby_id, lobby.has_password)}
                         className="px-4 py-2 rounded-lg text-sm font-medium text-white
-                                 bg-gradient-to-r from-game-primary to-game-secondary
+                                 bg-gradient-to-r from-primary-500 to-secondary-500
                                  hover:opacity-90 transition-all duration-200 hover:cursor-pointer
-                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={in_game || lobby.player_count >= 2}
 
                       >

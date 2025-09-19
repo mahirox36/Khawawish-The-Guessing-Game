@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { LoginError } from "../types";
+import { useAuth } from "@/contexts/AuthContext";
+import { LoginError } from "@/types";
 
 interface LoginProps {
   onSuccess: () => void;
@@ -42,7 +42,7 @@ export function Login({
           htmlFor="username"
           className="block text-sm font-medium text-gray-700 dark:text-gray-200"
         >
-          Username
+          Username/Email
         </label>
         <input
           type="text"
@@ -51,7 +51,7 @@ export function Login({
           onChange={(e) => setUsername(e.target.value)}
           className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   focus:ring-2 focus:ring-primary-500 dark:focus:ring-secondary-500 focus:border-transparent
                    transition-colors duration-200"
           required
         />
@@ -70,7 +70,7 @@ export function Login({
           onChange={(e) => setPassword(e.target.value)}
           className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   focus:ring-2 focus:ring-primary-500 dark:focus:ring-secondary-500 focus:border-transparent
                    transition-colors duration-200"
           required
         />
@@ -83,9 +83,9 @@ export function Login({
       <button
         type="submit"
         className="w-full flex justify-center py-3 px-4 rounded-lg text-sm font-semibold text-white
-                 bg-gradient-to-r from-game-primary to-game-secondary hover:opacity-90
+                 bg-gradient-to-r from-primary-500 to-secondary-500 hover:opacity-90
                  transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]
-                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary"
+                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
       >
         Sign in
       </button>

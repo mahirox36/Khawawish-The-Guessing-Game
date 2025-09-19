@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -67,11 +69,11 @@ export function Game({
         <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          className="md:w-64 p-4 bg-game-surface-light dark:bg-game-surface-dark md:h-screen justify-between flex flex-col items-center"
+          className="md:w-64 p-4 bg-surfacel-500 dark:bg-surfaced-500 md:h-screen justify-between flex flex-col items-center"
         >
           <div>
             <motion.h1
-              className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-game-primary to-game-secondary flex-shrink-0"
+              className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-secondary-500 flex-shrink-0"
               initial={{ y: -20 }}
               animate={{ y: 0 }}
               transition={{ duration: 0.5 }}
@@ -87,8 +89,8 @@ export function Game({
               <motion.div
                 className={`mt-4 text-lg font-semibold ${
                   user?.user_id === currentLobby?.user_turn
-                    ? "text-game-secondary"
-                    : "text-game-accent"
+                    ? "text-secondary-500"
+                    : "text-accent-500"
                 }`}
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
@@ -106,7 +108,7 @@ export function Game({
                 animate={{ opacity: 1, scale: 1 }}
                 className={`mt-4 text-xl font-bold
                 ${
-                  gameStatus === "Win" ? "text-game-secondary" : "text-red-500"
+                  gameStatus === "Win" ? "text-secondary-500" : "text-red-500"
                 }`}
               >
                 {gameStatus === "Win" ? "You Won! 🎉" : "Game Over 😔"}
@@ -121,14 +123,14 @@ export function Game({
                 {currentLobby?.owner?.user_id === user?.user_id && (
                   <button
                     onClick={onRematch}
-                    className="px-4 py-2 rounded-lg font-semibold bg-game-secondary text-white hover:shadow-lg transition-all"
+                    className="px-4 py-2 rounded-lg font-semibold bg-secondary-500 text-white hover:shadow-lg transition-all"
                   >
                     Rematch
                   </button>
                 )}
                 <button
                   onClick={onLeaveGame}
-                  className="px-4 py-2 rounded-lg font-semibold bg-game-accent text-white hover:shadow-lg transition-all"
+                  className="px-4 py-2 rounded-lg font-semibold bg-accent-500 text-white hover:shadow-lg transition-all"
                 >
                   Leave Game
                 </button>
@@ -138,7 +140,7 @@ export function Game({
 
           {ownImage && (
             <motion.div
-              className="mt-4 p-3 rounded-lg bg-game-surface-light dark:bg-game-surface-dark shadow-md group"
+              className="mt-4 p-3 rounded-lg bg-surfacel-500 dark:bg-surfaced-500 shadow-md group"
               whileHover={{ scale: 1.02 }}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -184,12 +186,12 @@ export function Game({
                     selectedIndexes.includes(index.toString())
                       ? "ring-4 ring-red-500/50"
                       : ""
-                  } ${ownImage === img ? "ring-4 ring-game-secondary/50" : ""} 
-                  bg-game-surface-light dark:bg-game-surface-dark
+                  } ${ownImage === img ? "ring-4 ring-secondary-500/50" : ""} 
+                  bg-surfacel-500 dark:bg-surfaced-500
                   transform transition-all duration-200 ease-in-out cursor-pointer
                   aspect-square ${
                     action === "Guess"
-                      ? "hover:ring-4 hover:ring-game-primary/70"
+                      ? "hover:ring-4 hover:ring-primary-500/70"
                       : "hover:ring-4 hover:ring-red-500/50"
                   }`}
                 onClick={() => handleClick(index, img)}
@@ -225,7 +227,7 @@ export function Game({
         <motion.div
           initial={{ x: 20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          className="md:w-48 p-4 bg-game-surface-light dark:bg-game-surface-dark md:h-screen flex-shrink-0
+          className="md:w-48 p-4 bg-surfacel-500 dark:bg-surfaced-500 md:h-screen flex-shrink-0
                     flex md:flex-col items-center md:items-stretch justify-center gap-4"
         >
           <button
@@ -239,8 +241,8 @@ export function Game({
             className={`px-4 py-3 rounded-lg font-semibold transition-all text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed 
               ${
                 action === "Guess"
-                  ? "bg-game-secondary text-white"
-                  : "bg-game-primary text-white hover:shadow-lg"
+                  ? "bg-secondary-500 text-white"
+                  : "bg-primary-500 text-white hover:shadow-lg"
               } hover:shadow-lg flex-1 md:flex-none`}
             disabled={
               phase !== "guessing" || user?.user_id !== currentLobby?.user_turn
@@ -250,7 +252,7 @@ export function Game({
           </button>
           <button
             onClick={onEndTurn}
-            className="px-4 py-3 rounded-lg font-semibold bg-game-accent text-white hover:shadow-lg transition-all text-sm md:text-base flex-1 md:flex-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-3 rounded-lg font-semibold bg-accent-500 text-white hover:shadow-lg transition-all text-sm md:text-base flex-1 md:flex-none disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={
               phase !== "guessing" || user?.user_id !== currentLobby?.user_turn
             }

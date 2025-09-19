@@ -1,25 +1,33 @@
+"use client";
+
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useAuth } from "./contexts/AuthContext";
-import { Login } from "./components/Login";
-import { Register } from "./components/Register";
-import { Game } from "./components/Game";
-import { LobbyList } from "./components/LobbyList";
-import { CreateLobby } from "./components/CreateLobby";
-import { DarkModeToggle } from "./components/DarkModeToggle";
-import { baseUrl } from "./api";
-import { api } from "./api";
+import { useAuth } from "@/contexts/AuthContext";
+import { Login } from "@/components/Login";
+import { Register } from "@/components/Register";
+import { Game } from "@/components/Game";
+import { LobbyList } from "@/components/LobbyList";
+import { CreateLobby } from "@/components/CreateLobby";
+import { DarkModeToggle } from "@/components/DarkModeToggle";
+import { baseUrl } from "@/api";
+import { api } from "@/api";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lobby } from "./types";
+import { Lobby } from "@/types";
 import { Crown } from "lucide-react";
 
 export default function App() {
   const { user, token, logout } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const verified = searchParams.get("verified");
   const [page, setPage] = useState<"auth" | "lobby" | "game">("auth");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [subPage, setSubPage] = useState<"list" | "create" | "waiting" | null>(
     null
   );
+
   const [phase, setPhase] = useState<"selection" | "guessing" | "results">(
     "selection"
   );
@@ -38,12 +46,23 @@ export default function App() {
   const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
   useEffect(() => {
+    if (verified !== null) {
+      if (verified == "true") {
+        toast.success("Your email has been verified");
+      } else {
+        toast.error("Your email couldn't be verified");
+      }
+
+      const params = new URLSearchParams(searchParams);
+      params.delete("verified");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
     if (token) {
       fetchLobbies();
       setPage("lobby");
     }
     if (!token || ws) return;
-    
+
     const current_ws = new WebSocket(`${baseUrl}/ws/game?token=${token}`);
     setWs(current_ws);
 
@@ -140,7 +159,7 @@ export default function App() {
 
     current_ws.onclose = () => {
       console.log("WebSocket connection closed");
-      
+
       // setWs(null);
     };
 
@@ -282,7 +301,7 @@ export default function App() {
             </motion.h2>
           </div>
 
-          <div className="mt-8 bg-game-surface-light dark:bg-game-surface-dark p-8 rounded-xl shadow-xl">
+          <div className="mt-8 bg-surfacel-500 dark:bg-surfaced-500 p-8 rounded-xl shadow-xl">
             <div className="flex justify-center space-x-4 mb-8">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -291,7 +310,7 @@ export default function App() {
                 className={`px-6 py-2 rounded-lg font-medium transition-colors
                   ${
                     authMode === "login"
-                      ? "bg-game-primary text-white"
+                      ? "bg-primary-500 text-white"
                       : "text-gray-600 dark:text-gray-300"
                   }`}
               >
@@ -304,7 +323,7 @@ export default function App() {
                 className={`px-6 py-2 rounded-lg font-medium transition-colors
                   ${
                     authMode === "register"
-                      ? "bg-game-primary text-white"
+                      ? "bg-primary-500 text-white"
                       : "text-gray-600 dark:text-gray-300"
                   }`}
               >
@@ -383,7 +402,7 @@ export default function App() {
             <motion.div
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
-              className="bg-game-surface-light dark:bg-game-surface-dark p-8 rounded-xl shadow-xl"
+              className="bg-surfacel-500 dark:bg-surfaced-500 p-8 rounded-xl shadow-xl"
             >
               <h2 className="text-2xl font-bold mb-6">Waiting Room</h2>
               <div className="space-y-4">
@@ -445,24 +464,24 @@ export default function App() {
 
                 <div className="flex justify-between">
                   <div className="flex space-x-4">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleReadyClick}
-                    className="px-6 py-3 rounded-lg bg-game-secondary text-white hover:bg-opacity-90 transition-colors"
-                  >
-                    Ready
-                  </motion.button>
-                  {user?.user_id === currentLobby.owner?.user_id && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={handleStartGame}
-                      className="px-6 py-3 rounded-lg bg-game-primary text-white hover:bg-opacity-90 transition-colors"
+                      onClick={handleReadyClick}
+                      className="px-6 py-3 rounded-lg bg-secondary-500 text-white hover:bg-opacity-90 transition-colors"
                     >
-                      Start Game
+                      Ready
                     </motion.button>
-                  )}
+                    {user?.user_id === currentLobby.owner?.user_id && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleStartGame}
+                        className="px-6 py-3 rounded-lg bg-primary-500 text-white hover:bg-opacity-90 transition-colors"
+                      >
+                        Start Game
+                      </motion.button>
+                    )}
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -481,17 +500,24 @@ export default function App() {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="bg-game-surface-light dark:bg-game-surface-dark p-8 rounded-xl shadow-xl"
+                className="bg-surfacel-500 dark:bg-surfaced-500 p-8 rounded-xl shadow-xl"
               >
-                <CreateLobby in_game={user?.in_game || connectedError} onCreateLobby={handleCreateLobby} />
+                <CreateLobby
+                  in_game={user?.in_game || connectedError}
+                  onCreateLobby={handleCreateLobby}
+                />
               </motion.div>
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="bg-game-surface-light dark:bg-game-surface-dark p-8 rounded-xl shadow-xl"
+                className="bg-surfacel-500 dark:bg-surfaced-500 p-8 rounded-xl shadow-xl"
               >
-                <LobbyList in_game={user?.in_game || connectedError} lobbies={lobbies} onJoinLobby={handleJoinLobby} />
+                <LobbyList
+                  in_game={user?.in_game || connectedError}
+                  lobbies={lobbies}
+                  onJoinLobby={handleJoinLobby}
+                />
               </motion.div>
             </div>
           )}
@@ -501,7 +527,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-game-bg-light dark:bg-game-bg-dark">
+    <div className="min-h-screen bg-[game-bg-light] dark:bg-darkb-500">
       <DarkModeToggle />
       <Game
         key={refreshKey}

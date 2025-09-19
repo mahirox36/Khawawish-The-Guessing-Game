@@ -1,8 +1,12 @@
 import asyncio
 import uuid
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from fastapi import (
+    BackgroundTasks,
     FastAPI,
     WebSocket,
     WebSocketDisconnect,
@@ -10,6 +14,7 @@ from fastapi import (
     Depends,
     status,
 )
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
@@ -24,6 +29,10 @@ import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from models.game import GameSessionStatus, User, GameSession, UserResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from urllib.parse import quote
 
 # Set up logging
 logging.basicConfig(
@@ -42,12 +51,26 @@ app = FastAPI(
     version="1.0.0",
 )
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # type: ignore
+
 load_dotenv()
 db_url = os.getenv("DB_URL", "sqlite://db.sqlite3")
+
+SMTP_SERVER = os.getenv("SMTP_SERVER", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 0))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+if not SMTP_PASS or SMTP_PORT == 0 or not SMTP_SERVER or not SMTP_USER or not SMTP_FROM:
+    raise Exception("Setup SMTP in the .env: SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM")
 
 JWT_SECRET = os.getenv("JWT_SECRET", "secret")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7
+DEBUG = os.getenv("DEBUG", "false")
+DEBUG = True if DEBUG == "true" else False
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -56,6 +79,33 @@ security = HTTPBearer()
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+def send_email(to_email: str, subject: str, body: str):
+    msg = MIMEMultipart()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "html"))
+
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        server.starttls() 
+        server.login(SMTP_USER, SMTP_PASS)
+        server.sendmail(SMTP_USER, to_email, msg.as_string())
+
+async def send_verification(to_email: str, background_tasks: BackgroundTasks, user: User):
+    userToken = uuid.uuid4()
+    user.email_token = str(userToken)
+    await user.save(update_fields=["email_token"])
+    baseURL = "http://127.0.0.1:8153" if DEBUG else "https://khawawish.mahirou.online"
+    verification_link = f"{baseURL}/api/auth/verify?email={quote(to_email)}&token={quote(str(userToken))}"
+    subject = "Verify your email"
+    body = f"""
+    <h2>Welcome to Khawawish</h2>
+    <p>Please verify your email by clicking below:</p>
+    <a href="{verification_link}">Verify Email</a>
+    """
+    background_tasks.add_task(send_email, to_email, subject, body)
+    return True
 
 
 # Register Tortoise ORM
@@ -663,7 +713,8 @@ class GameWebSocket:
                                 )
                                 if other_user:
                                     other_user.current_streak = 0
-                                    await other_user.save(update_fields=["current_streak"])
+                                    other_user.games_lose += 1
+                                    await other_user.save(update_fields=["current_streak", "games_lose"])
 
                             # End game session
                             if self.game_session:
@@ -835,8 +886,13 @@ class GameWebSocket:
 
 # Authentication endpoints
 @api.post("/auth/register", response_model=TokenResponse)
-async def register_user(user_data: UserRegister):
+async def register_user(user_data: UserRegister, background_tasks: BackgroundTasks):
     try:
+        if "@" in user_data.username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username Can't Contain @",
+            )
         # Check if username or email already exists
         existing_user = await User.get_or_none(username=user_data.username.lower())
         if existing_user:
@@ -860,6 +916,7 @@ async def register_user(user_data: UserRegister):
             password_hash=hashed_password,
             display_name=user_data.display_name or user_data.username.capitalize(),
         )
+        await send_verification(user.email, background_tasks, user)
 
         # Create access token
         access_token = create_access_token(data={"sub": user.user_id})
@@ -877,8 +934,11 @@ async def register_user(user_data: UserRegister):
 
 
 @api.post("/auth/login", response_model=TokenResponse)
-async def login_user(user_data: UserLogin):
-    user = await User.get_or_none(username=user_data.username.lower())
+async def login_user(user_data: UserLogin, background_tasks: BackgroundTasks):
+    if "@" in user_data.username:
+        user = await User.get_or_none(email=user_data.username.lower())
+    else:
+        user = await User.get_or_none(username=user_data.username.lower())
     if not user or not verify_password(user_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -896,6 +956,28 @@ async def login_user(user_data: UserLogin):
         token_type="bearer",
         user=user.export_data(),
     )
+
+@api.post("/auth/send_verification")
+async def auth_send_verification(background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
+    if user.is_verified:
+        return {"status": "already verified"}
+    await send_verification(user.email, background_tasks, user)
+    return {"status": "sent"}
+
+@api.get("/auth/verify")
+async def verify(email: str, token: str):
+    url = "http://localhost:3000" if DEBUG else ""
+    user = await User.get_or_none(email=email)
+    if not user:
+        return RedirectResponse(url=f"{url}/?verified=false")
+    if user.email_token == token:
+        user.email_token = ""
+        user.is_verified = True
+        await user.save(update_fields=["email_token", "is_verified"])
+        return RedirectResponse(url=f"{url}/?verified=true")
+    logger.info(token)
+    
+    return RedirectResponse(url=f"{url}/?verified=false")
 
 
 @api.get("/auth/me", response_model=UserResponse)

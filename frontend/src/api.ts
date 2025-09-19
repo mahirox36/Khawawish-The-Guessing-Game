@@ -1,3 +1,5 @@
+"use client";
+
 import axios from "axios";
 
 export const isDevelopment = process.env.NODE_ENV === "development";

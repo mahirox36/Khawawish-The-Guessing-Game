@@ -84,7 +84,7 @@ export function Register({
           onChange={handleChange}
           className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   focus:ring-2 focus:ring-primary-500 dark:focus:ring-secondary-500 focus:border-transparent
                    transition-colors duration-200"
           required
         />
@@ -105,7 +105,7 @@ export function Register({
           onChange={handleChange}
           className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   focus:ring-2 focus:ring-primary-500 dark:focus:ring-secondary-500 focus:border-transparent
                    transition-colors duration-200"
           required
         />
@@ -126,7 +126,7 @@ export function Register({
           onChange={handleChange}
           className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   focus:ring-2 focus:ring-primary-500 dark:focus:ring-secondary-500 focus:border-transparent
                    transition-colors duration-200"
         />
       </div>
@@ -146,7 +146,7 @@ export function Register({
           onChange={handleChange}
           className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
                    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-                   focus:ring-2 focus:ring-game-primary dark:focus:ring-game-secondary focus:border-transparent
+                   focus:ring-2 focus:ring-primary-500 dark:focus:ring-secondary-500 focus:border-transparent
                    transition-colors duration-200"
           required
         />
@@ -165,9 +165,9 @@ export function Register({
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         className="w-full flex justify-center py-3 px-4 rounded-lg text-sm font-semibold text-white
-                 bg-gradient-to-r from-game-primary to-game-secondary hover:opacity-90
+                 bg-gradient-to-r from-primary-500 to-secondary-500 hover:opacity-90
                  transform transition-all duration-200
-                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-game-primary"
+                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
       >
         Create Account
       </motion.button>
