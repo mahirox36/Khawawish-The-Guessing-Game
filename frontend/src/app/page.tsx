@@ -20,13 +20,17 @@ export default function App() {
   const { user, token, logout } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const [verified, setVerified] = useState<string | null>(null);
   const pathname = usePathname();
-  const verified = searchParams.get("verified");
   const [page, setPage] = useState<"auth" | "lobby" | "game">("auth");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [subPage, setSubPage] = useState<"list" | "create" | "waiting" | null>(
     null
   );
+
+  useEffect(() => {
+    setVerified(searchParams.get("verified"));
+  }, [searchParams]);
 
   const [phase, setPhase] = useState<"selection" | "guessing" | "results">(
     "selection"
