@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "khawawish.53d8c10827953d6d9760ef1e07f44e09.r2.cloudflarestorage.com",
+        hostname: "cdn.khawawish.mahirou.online",
         port: "",
         pathname: "/**",
       },
