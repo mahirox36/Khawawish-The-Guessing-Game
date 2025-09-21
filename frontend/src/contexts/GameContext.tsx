@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  Dispatch,
+  SetStateAction,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "./AuthContext";
 import { api, baseUrl } from "@/api";
@@ -16,6 +23,11 @@ type GameContextType = {
   ws: WebSocket | null;
   refreshKey: number;
   connectedError: boolean;
+  selectedIndexes: string[];
+  ownImage: string | null;
+  isShiftHeld: boolean;
+  setSelectedIndexes: Dispatch<SetStateAction<string[]>>;
+  setOwnImage: (ownImage: string) => void;
   handleCharacterDiscard: (character: string) => void;
   handleOwnCharacterSelect: (character: string) => void;
   handleRefresh: () => void;
@@ -53,17 +65,45 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [connectedError, setConnectedError] = useState<boolean>(false);
   const handleRefresh = () => setRefreshKey((prev) => prev + 1);
+  const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);
+  const [ownImage, setOwnImage] = useState<string | null>(null);
+  const [isShiftHeld, setIsShiftHeld] = useState(false);
 
   const pathname = usePathname();
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Shift") {
+        setIsShiftHeld(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") {
+        setIsShiftHeld(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
     const okPages = ["/login", "/"];
     const gamePages = ["/lobby", "/game"];
-    const isOkPage = okPages.includes(pathname) || pathname.startsWith("/profile");
+    const isOkPage =
+      okPages.includes(pathname) || pathname.startsWith("/profile");
     if (!token && !isOkPage) {
       router.replace("/login");
     } else if (!currentLobby && gamePages.includes(pathname)) {
       router.replace("/rooms");
+    } else if (!currentLobby && pathname === "/game") {
+      router.push("/rooms");
     }
   }, [pathname, token, router, currentLobby]);
 
@@ -74,8 +114,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     if (!token || ws) return;
 
-    (async ()=>{
-      await fetchLobbies()
+    (async () => {
+      await fetchLobbies();
     })();
 
     const current_ws = new WebSocket(`${baseUrl}/ws/game?token=${token}`);
@@ -100,6 +140,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setPhase("selection");
           break;
         case "rematch_started":
+          setImages([]);
+          setSelectedIndexes([]);
+          setOwnImage(null);
           setImages(message.images);
           setPhase("selection");
           setStatus(null);
@@ -239,6 +282,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       toast.error("At least 2 players are required to start the game.");
       return;
     }
+    setImages([]);
+    setSelectedIndexes([]);
+    setOwnImage(null);
     ws?.send(JSON.stringify({ type: "start_game", isRematch: true }));
     setStatus(null);
     setPhase("selection");
@@ -293,6 +339,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         ws,
         refreshKey,
         connectedError,
+        selectedIndexes,
+        setSelectedIndexes,
+        ownImage,
+        setOwnImage,
+        isShiftHeld,
         handleCharacterDiscard,
         handleOwnCharacterSelect,
         handleRefresh,

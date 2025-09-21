@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import NextImage from "next/image";
 import { motion } from "framer-motion";
 import { useGame } from "@/contexts/GameContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 export default function App() {
   const {
@@ -20,19 +19,15 @@ export default function App() {
     status,
     handleLeaveGame,
     currentLobby,
+    ownImage,
+    setOwnImage,
+    setSelectedIndexes,
+    selectedIndexes,
+    isShiftHeld,
   } = useGame();
   const { user } = useAuth();
-  const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);
-  const [ownImage, setOwnImage] = useState<string>();
-  const [action, setAction] = useState<"Guess" | "Discard">("Discard");
 
-  const router = useRouter();
-  useEffect(() => {
-    router.prefetch("/rooms");
-    if (images.length === 0) {
-      router.push("/rooms")
-    }
-  }, [router, images]);
+  const [action, setAction] = useState<"Guess" | "Discard">("Discard");
 
   const handleClick = (index: number, image: string) => {
     if (phase === "results") return;
@@ -181,7 +176,7 @@ export default function App() {
                   whileTap={{ scale: 0.98 }}
                   className={`group relative overflow-hidden rounded-lg shadow-lg 
                   ${
-                    selectedIndexes.includes(index.toString())
+                    selectedIndexes.includes(index.toString()) && !isShiftHeld
                       ? "ring-4 ring-red-500/50"
                       : ""
                   } ${ownImage === img ? "ring-4 ring-secondary-500/50" : ""} 
@@ -204,16 +199,22 @@ export default function App() {
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={`absolute inset-0 bg-red-500/20 ${
-                        localStorage.performance === "true"
-                          ? ""
-                          : "backdrop-blur-sm"
-                      }`}
+                      className={
+                        !isShiftHeld
+                          ? `absolute inset-0 bg-red-500/20 ${
+                              localStorage.performance === "true"
+                                ? ""
+                                : "backdrop-blur-sm"
+                            }`
+                          : ""
+                      }
                     >
-                      <X
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white"
-                        size={30}
-                      />
+                      {!isShiftHeld && (
+                        <X
+                          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white"
+                          size={30}
+                        />
+                      )}
                     </motion.div>
                   )}
                 </motion.div>
