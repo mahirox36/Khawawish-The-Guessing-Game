@@ -9,10 +9,13 @@ import {
 } from "react";
 import { User, AuthResponse, LoginError } from "@/types";
 import { api } from "@/api";
+import { useRouter } from "next/navigation";
+import { AxiosError } from "axios";
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  authReady: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (
     username: string,
@@ -28,6 +31,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -43,21 +48,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(savedToken);
         api.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
       } else {
+        setToken(null);
+        setUser(null);
         localStorage.removeItem("user");
         localStorage.removeItem("token");
       }
     }
+    setAuthReady(true);
 
     // Refresh user from server
     (async () => {
+      if (!token) return;
       try {
         const user_me = await api.get("/auth/me");
         setUser(user_me.data);
-      } catch {
-        // ignore
+        localStorage.setItem("user", JSON.stringify(user_me.data));
+      } catch (err) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+        }
       }
     })();
-  }, []);
+  }, [token]);
 
   const handleAuthResponse = (response: AuthResponse) => {
     setUser(response.user);
@@ -126,11 +141,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     delete api.defaults.headers.common["Authorization"];
-    document.location.reload();
+    router.push("/");
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, token, authReady, login, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

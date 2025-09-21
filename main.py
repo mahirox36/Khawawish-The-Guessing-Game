@@ -8,13 +8,14 @@ from dotenv import load_dotenv
 from fastapi import (
     BackgroundTasks,
     FastAPI,
+    UploadFile,
     WebSocket,
     WebSocketDisconnect,
     HTTPException,
     Depends,
     status,
 )
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
@@ -28,11 +29,13 @@ from typing import List, Union, Optional
 import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from models.game import GameSessionStatus, User, GameSession, UserResponse
+from models.game import GameSessionStatus, Uploads, User, GameSession, UserResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from urllib.parse import quote
+
+from models.storage import StorageConfig, StorageManager, convert_to_webp
 
 # Set up logging
 logging.basicConfig(
@@ -69,8 +72,19 @@ if not SMTP_PASS or SMTP_PORT == 0 or not SMTP_SERVER or not SMTP_USER or not SM
 JWT_SECRET = os.getenv("JWT_SECRET", "secret")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7
-DEBUG = os.getenv("DEBUG", "false")
-DEBUG = True if DEBUG == "true" else False
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
+ENDPOINT=os.getenv("ENDPOINT")
+ACCESS_KEY=os.getenv("ACCESS_KEY")
+SECRET_KEY=os.getenv("SECRET_KEY")
+BUCKET_NAME=os.getenv("BUCKET_NAME")
+PUBLIC_URL=os.getenv("PUBLIC_URL")
+DEBUG_URL=os.getenv("DEBUG_URL")
+if  not ENDPOINT or not ACCESS_KEY or not SECRET_KEY or not BUCKET_NAME or not PUBLIC_URL or not DEBUG_URL:
+    raise Exception("Setup S3 in the .env: ENDPOINT, ACCESS_KEY, SECRET_KEY, BUCKET_NAME, PUBLIC_URL")
+
+storage = StorageManager(StorageConfig(ENDPOINT, ACCESS_KEY, SECRET_KEY, BUCKET_NAME, PUBLIC_URL, DEBUG_URL))
+
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -127,7 +141,7 @@ app.add_middleware(
 )
 
 # Mount static files directory
-app.mount("/api/static", StaticFiles(directory="static"), name="static")
+# app.mount("/api/static", StaticFiles(directory="static"), name="static")
 
 api = APIRouter(prefix="/api")
 
@@ -143,6 +157,15 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+    
+class UserEdit(BaseModel):
+    username: Optional[str]
+    email: Optional[str]
+    display_name: Optional[str]
+    avatar_url: Optional[str]
+    banner_url: Optional[str]
+    bio: Optional[str]
+    
 
 
 class TokenResponse(BaseModel):
@@ -152,11 +175,10 @@ class TokenResponse(BaseModel):
 
 
 # Utility functions
-def get_static_file_names():
-    static_dir = "static/images"
-    return [
-        f for f in os.listdir(static_dir) if os.path.isfile(os.path.join(static_dir, f))
-    ]
+def get_static_file_names(count: int = 578):
+    base_url = DEBUG_URL if DEBUG else PUBLIC_URL
+    static_dir = f"{base_url}/game_assets"
+    return [f"{static_dir}/{image}.webp" for image in range(count)]
 
 
 static_file_names = get_static_file_names()
@@ -916,7 +938,8 @@ async def register_user(user_data: UserRegister, background_tasks: BackgroundTas
             password_hash=hashed_password,
             display_name=user_data.display_name or user_data.username.capitalize(),
         )
-        await send_verification(user.email, background_tasks, user)
+        if not DEBUG:
+            await send_verification(user.email, background_tasks, user)
 
         # Create access token
         access_token = create_access_token(data={"sub": user.user_id})
@@ -987,6 +1010,74 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
         current_user.toast_user = False
         await current_user.save(update_fields=["toast_user"])
     return data
+@api.get("/user/{username}", response_model=UserResponse)
+async def get_user(username: str):
+    user = await User.get_or_none(username = username)
+    if not user:
+        raise HTTPException(404, "User Not Found")
+    return user.export_data(False)
+
+@api.post("/auth/edit", response_model=UserResponse)
+async def edit_user(edit: UserEdit, user: User = Depends(get_current_user)):
+    fields_to_update = []
+    if edit.username and edit.username != user.username:
+        username_user = User.get_or_none(username=edit.username)
+        if username_user:
+            raise HTTPException(400, detail="username is already used")
+        user.username = edit.username
+        fields_to_update.append("username")
+    if edit.email and edit.email != user.email:
+        email_user = User.get_or_none(email=edit.email)
+        if email_user:
+            raise HTTPException(400, detail="email is already used")
+        user.email = edit.email
+        fields_to_update.append("email")
+    for field in ["avatar_url", "banner_url"]:
+        new_value = getattr(edit, field)
+        old_value = getattr(user, field)
+
+        if new_value and new_value != old_value:  # only delete if user is changing it
+            if old_value:
+                if PUBLIC_URL in old_value:
+                    upload = await Uploads.get_or_none(public_url=old_value)
+                    if upload:
+                        await storage.delete_file(upload.file_name)
+                        await upload.delete()
+                if DEBUG_URL in old_value:
+                    upload = await Uploads.get_or_none(dev_url=old_value)
+                    if upload:
+                        await storage.delete_file(upload.file_name)
+                        await upload.delete()
+    for field in ["display_name", "avatar_url", "banner_url", "bio"]:
+        value = getattr(edit, field)
+        if value is not None:
+            setattr(user, field, value)
+            fields_to_update.append(field)
+    await user.save(update_fields=fields_to_update)
+    return user.export_data()
+
+    
+
+
+@api.post("/upload")
+async def upload_image(file: UploadFile):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image uploads allowed.")
+    if  file.size and file.size > 5_000_000:
+        raise HTTPException(status_code=400, detail="File too large")
+
+    # convert to webp
+    webp_bytes = await convert_to_webp(file)
+
+    # generate unique filename
+    filename = f"{uuid.uuid4().hex}.webp"
+
+    # upload with StorageManager (runs in executor internally)
+    public_url, _, debug_url, unique_filename = await storage.upload_file(webp_bytes, filename, "profiles")
+    
+    await Uploads.create(public_url=public_url, dev_url=debug_url, file_name=unique_filename)
+
+    return JSONResponse({"url": public_url if not DEBUG else debug_url})
 
 
 # Lobby endpoints

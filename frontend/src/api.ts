@@ -5,7 +5,7 @@ import axios from "axios";
 export const isDevelopment = process.env.NODE_ENV === "development";
 export const baseUrl = isDevelopment
   ? "http://localhost:8153/api"
-  : "/api";
+  : "http://localhost:8153/api";
 
 export const api = axios.create({
   baseURL: baseUrl,

@@ -12,6 +12,7 @@ class UserResponse(BaseModel):
     email: str
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    banner_url: Optional[str] = None
     bio: Optional[str] = None
     games_played: int = 0
     games_won: int = 0
@@ -29,6 +30,12 @@ class UserResponse(BaseModel):
     win_rate: float
     average_score: float
 
+class Uploads(Model):
+    id = fields.BigIntField(pk=True)
+    public_url = fields.CharField(max_length=500, unique=True)
+    dev_url = fields.CharField(max_length=500, unique=True)
+    file_name = fields.CharField(max_length=500, unique=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
 
 class User(Model):
     """User model for authentication and game statistics"""
@@ -41,6 +48,7 @@ class User(Model):
 
     # Profile info
     avatar_url = fields.CharField(max_length=500, null=True)
+    banner_url = fields.CharField(max_length=500, null=True)
     bio = fields.TextField(null=True)
 
     # Game statistics
@@ -79,6 +87,7 @@ class User(Model):
             email=self.email,
             display_name=self.display_name,
             avatar_url=self.avatar_url,
+            banner_url=self.banner_url,
             bio=self.bio,
             games_played=self.games_played,
             games_won=self.games_won,
@@ -102,20 +111,22 @@ class User(Model):
 
     @property
     def win_rate(self) -> float:
-        if self.games_played == 0:
+        total_resolved = self.games_won + self.games_lose
+        if self.games_played == 0 or total_resolved == 0:
             return 0.0
-        return (self.games_won / self.games_lose) * 100
+        return (self.games_won / total_resolved) * 100
 
     @property
     def average_score(self) -> float:
-        if self.games_played == 0:
+        total_resolved = self.games_won + self.games_lose
+        if self.games_played == 0 or total_resolved == 0:
             return 0.0
-        return self.total_score / (self.games_lose + self.games_won)
+        return self.total_score / total_resolved
 
 
 class GameSessionStatus(StrEnum):
     """Enum for game session status"""
-
+    
     WAITING = "waiting"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"

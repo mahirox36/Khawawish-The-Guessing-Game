@@ -4,6 +4,7 @@ export interface User {
   email: string;
   display_name: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
   bio: string | null;
   games_played: number;
   games_won: number;
@@ -22,11 +23,21 @@ export interface User {
   average_score: number;
 }
 
+export interface UserEdit {
+  username?: string;
+  email?: string;
+  display_name?: string;
+  avatar_url?: string;
+  banner_url?: string;
+  bio?: string;
+}
 export interface Player {
   user_id: string;
   username: string;
   display_name: string;
   is_ready: boolean;
+  avatar_url: string
+  banner_url: string
 }
 
 export interface Lobby {
