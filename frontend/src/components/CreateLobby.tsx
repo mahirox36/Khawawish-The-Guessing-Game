@@ -13,7 +13,7 @@ interface CreateLobbyProps {
 }
 
 export function CreateLobby({ in_game, onCreateLobby }: CreateLobbyProps) {
-  const [maxImages, setMaxImages] = useState(25);
+  const [maxImages, setMaxImages] = useState(24);
   const [lobbyName, setLobbyName] = useState('');
   const [password, setPassword] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);

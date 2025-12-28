@@ -174,6 +174,41 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+# Add these Pydantic models for leaderboard queries
+class LeaderboardEntry(BaseModel):
+    rank: int
+    user_id: str
+    username: str
+    display_name: str
+    avatar_url: Optional[str] = None
+    games_won: int
+    total_score: int
+    best_streak: int
+    games_played: int
+    win_rate: float
+    average_score: float
+
+
+class LeaderboardResponse(BaseModel):
+    entries: List[LeaderboardEntry]
+    total_count: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class UserSearchResult(BaseModel):
+    user_id: str
+    username: str
+    display_name: str
+    avatar_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    games_won: int
+    total_score: int
+    in_game: bool
+    is_verified: bool
+
+
 # Utility functions
 def get_static_file_names(count: int = 578):
     base_url = DEBUG_URL if DEBUG else PUBLIC_URL
@@ -313,11 +348,18 @@ class GameLobby:
         else:
             self.user_turn = self.owner.user_id
 
-    def get_other_player_id(self, user_id: str) -> Optional[str]:
+    def get_other_player_id(self, user_id: str) -> Optional[Player]:
         if self.owner and self.owner.user_id == user_id:
-            return self.second_player.user_id if self.second_player else None
+            return self.second_player if self.second_player else None
         elif self.second_player and self.second_player.user_id == user_id:
-            return self.owner.user_id if self.owner else None
+            return self.owner if self.owner else None
+        return None
+
+    def get_player(self, user_id: str) -> Optional[Player]:
+        if self.owner and self.owner.user_id == user_id:
+            return self.owner
+        elif self.second_player and self.second_player.user_id == user_id:
+            return self.second_player
         return None
 
     def add_second_player(self, user_id: str, username: str, display_name: str):
@@ -691,22 +733,24 @@ class GameWebSocket:
                     if lobby and guessed_character:
                         if lobby.guess_character(self.user.user_id, guessed_character):
                             # lobby.switch_turn()
+                            # get the current user character from gameLobby
+                            user = lobby.get_player(self.user.user_id)
+                            if not user:
+                                # impossible case
+                                continue
+                                
+                            
                             await self.websocket.send_json(
                                 {
                                     "type": "correct_guess",
-                                    "user_id": self.user.user_id,
-                                    "username": self.user.username,
-                                    "display_name": self.user.display_name,
                                     "character": guessed_character,
+                                    "lobby": lobby.to_dict(),
                                 }
                             )
                             await self.connection.broadcast_lobby(
                                 {
                                     "type": "player_scored",
-                                    "user_id": self.user.user_id,
-                                    "username": self.user.username,
-                                    "display_name": self.user.display_name,
-                                    "character": guessed_character,
+                                    "character": user.character,
                                     "lobby": lobby.to_dict(),
                                 },
                                 self.lobby_id,
@@ -726,12 +770,12 @@ class GameWebSocket:
                                     "best_streak",
                                 ]
                             )
-                            other_player_id = lobby.get_other_player_id(
+                            other_player = lobby.get_other_player_id(
                                 self.user.user_id
                             )
-                            if other_player_id:
+                            if other_player:
                                 other_user = await User.get_or_none(
-                                    user_id=other_player_id
+                                    user_id=other_player.user_id
                                 )
                                 if other_user:
                                     other_user.current_streak = 0
@@ -830,12 +874,12 @@ class GameWebSocket:
                             )
                 elif msg_type == "leave_lobby":
                     lobby = LobbyManager.get(self.lobby_id)
-                    in_result = data.get("in_result", False)
+                    in_game = lobby.game_started if lobby else False
                     if lobby:
                         lobby.remove_player(self.user.user_id)
                         await self.connection.broadcast_lobby(
                             {
-                                "type": f"player_left{"_in_results" if in_result else ""}",
+                                "type": f"player_left{"_in_game" if in_game else ""}",
                                 "user_id": self.user.user_id,
                                 "username": self.user.username,
                                 "lobby": lobby.to_dict(),
@@ -877,12 +921,13 @@ class GameWebSocket:
         try:
             lobby = LobbyManager.get(self.lobby_id)
             if lobby:
+                in_game = lobby.game_started
                 self.user.in_game = False
                 await self.user.save(update_fields=["in_game"])
                 lobby.remove_player(self.user.user_id)
                 await self.connection.broadcast_lobby(
                     {
-                        "type": "player_left",
+                        "type": f"player_left{"_in_game" if in_game else ""}",
                         "user_id": self.user.user_id,
                         "username": self.user.username,
                         "lobby": lobby.to_dict(),
@@ -1010,12 +1055,187 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
         current_user.toast_user = False
         await current_user.save(update_fields=["toast_user"])
     return data
+
 @api.get("/user/{username}", response_model=UserResponse)
 async def get_user(username: str):
-    user = await User.get_or_none(username = username)
+    user = await User.get_or_none(username=username)
     if not user:
         raise HTTPException(404, "User Not Found")
     return user.export_data(False)
+
+@api.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_leaderboard(
+    sort_by: str = "games_won",
+    order: str = "desc",
+    page: int = 1,
+    page_size: int = 20,
+    min_games: int = 0,
+    min_win_rate: float = 0.0,
+):
+    """
+    Get customizable leaderboard with filtering and sorting.
+    
+    Query Parameters:
+    - sort_by: 'games_won', 'total_score', 'best_streak', 'win_rate', 'average_score', 'games_played' (default: 'games_won')
+    - order: 'asc' or 'desc' (default: 'desc')
+    - page: Page number (default: 1)
+    - page_size: Entries per page, max 100 (default: 20)
+    - min_games: Minimum games played filter (default: 0)
+    - min_win_rate: Minimum win rate % filter (default: 0.0)
+    """
+    # Validate inputs
+    if page < 1:
+        page = 1
+    if page_size < 1 or page_size > 100:
+        page_size = 20
+    
+    valid_sort_fields = {
+        "games_won", "total_score", "best_streak", "win_rate", 
+        "average_score", "games_played"
+    }
+    if sort_by not in valid_sort_fields:
+        sort_by = "games_won"
+    
+    if order.lower() not in ["asc", "desc"]:
+        order = "desc"
+    
+    # Build query
+    query = User.all()
+    
+    # Apply filters
+    if min_games > 0:
+        query = query.filter(games_played__gte=min_games)
+    if min_win_rate > 0:
+        # Filter by win_rate (games_won / (games_won + games_lose))
+        query = query.filter(games_won__gt=0)
+    
+    # Count total before pagination
+    total_count = await query.count()
+    
+    # Apply sorting
+    sort_field = f"-{sort_by}" if order.lower() == "desc" else sort_by
+    query = query.order_by(sort_field)
+    
+    # Apply pagination
+    offset = (page - 1) * page_size
+    users = await query.offset(offset).limit(page_size)
+    
+    # Build leaderboard entries with ranks
+    entries = []
+    for idx, user in enumerate(users):
+        rank = offset + idx + 1
+        entries.append(
+            LeaderboardEntry(
+                rank=rank,
+                user_id=user.user_id,
+                username=user.username,
+                display_name=user.display_name,
+                avatar_url=user.avatar_url,
+                games_won=user.games_won,
+                total_score=user.total_score,
+                best_streak=user.best_streak,
+                games_played=user.games_played,
+                win_rate=user.win_rate,
+                average_score=user.average_score,
+            )
+        )
+    
+    # Apply win_rate filter post-fetch if needed
+    if min_win_rate > 0:
+        entries = [e for e in entries if e.win_rate >= min_win_rate]
+    
+    total_pages = (len(entries) + page_size - 1) // page_size if entries else 1
+    
+    return LeaderboardResponse(
+        entries=entries,
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
+
+
+@api.get("/search/users", response_model=List[UserSearchResult])
+async def search_users(
+    q: str = "",
+    limit: int = 10,
+):
+    """
+    Search for users by username or display name.
+    
+    Query Parameters:
+    - q: Search query (searches username and display_name)
+    - limit: Maximum results returned, max 50 (default: 10)
+    """
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Search query must be at least 2 characters"
+        )
+    
+    if limit < 1 or limit > 50:
+        limit = 10
+    
+    search_term = q.strip().lower()
+    
+    # Search in both username and display_name
+    users = await User.filter(
+        username__icontains=search_term
+    ).limit(limit * 2)  # Fetch more to filter display_name
+    
+    # Additional filter on display_name
+    results = []
+    for user in users:
+        if len(results) >= limit:
+            break
+        if (search_term in user.username.lower() or 
+            search_term in user.display_name.lower()):
+            results.append(
+                UserSearchResult(
+                    user_id=user.user_id,
+                    username=user.username,
+                    display_name=user.display_name,
+                    avatar_url=user.avatar_url,
+                    banner_url=user.banner_url,
+                    games_won=user.games_won,
+                    total_score=user.total_score,
+                    in_game=user.in_game,
+                    is_verified=user.is_verified,
+                )
+            )
+    
+    return results
+
+
+@api.get("/user/{username}/rank")
+async def get_user_rank(username: str, sort_by: str = "games_won"):
+    """
+    Get a specific user's rank on the leaderboard.
+    
+    Query Parameters:
+    - sort_by: 'games_won', 'total_score', 'best_streak', 'win_rate', 'average_score' (default: 'games_won')
+    """
+    user = await User.get_or_none(username=username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    valid_sort_fields = {
+        "games_won", "total_score", "best_streak", "win_rate", "average_score"
+    }
+    if sort_by not in valid_sort_fields:
+        sort_by = "games_won"
+    
+    # Count users ahead
+    sort_field = f"-{sort_by}" if sort_by in ["games_won", "total_score", "best_streak", "average_score"] else sort_by
+    users_ahead = await User.filter(**{f"{sort_by}__gt": getattr(user, sort_by)}).count()
+    
+    return {
+        "username": user.username,
+        "rank": users_ahead + 1,
+        "sort_by": sort_by,
+        "stat_value": getattr(user, sort_by),
+    }
+
 
 @api.post("/auth/edit", response_model=UserResponse)
 async def edit_user(edit: UserEdit, user: User = Depends(get_current_user)):
@@ -1155,7 +1375,6 @@ async def websocket_game(websocket: WebSocket, token: str):
 
 
 app.include_router(api)
-
 
 # Health check endpoint
 @app.get("/health")

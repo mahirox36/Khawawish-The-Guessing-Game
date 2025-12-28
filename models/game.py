@@ -161,3 +161,4 @@ class GameSession(Model):
 
     def __str__(self):
         return f"GameSession({self.lobby_id} - {self.status})"
+

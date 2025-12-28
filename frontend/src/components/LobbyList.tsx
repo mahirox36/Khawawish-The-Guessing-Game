@@ -21,7 +21,6 @@ export function LobbyList({ in_game, lobbies, onJoinLobby }: LobbyListProps) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                whileHover={{ scale: 1.02 }}
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden
                          border border-gray-200 dark:border-gray-700 hover:shadow-lg
                          transition-all duration-200"

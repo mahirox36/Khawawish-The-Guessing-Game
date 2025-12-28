@@ -12,8 +12,10 @@ import {
   Sun,
   Sparkles,
   ChevronDown,
-  Users,
   UserIcon,
+  DoorOpen,
+  Trophy,
+  UserRound,
 } from "lucide-react";
 import { User } from "@/types";
 import NextImage from "next/image";
@@ -129,17 +131,17 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
       {/* Action Buttons */}
       <div className="flex gap-2">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              onShow(user_profile.username)
-            }}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/80 hover:bg-blue-500 rounded-xl text-white text-sm font-medium transition-colors"
-          >
-            <Eye className="w-4 h-4" />
-            View Profile
-          </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => {
+            onShow(user_profile.username);
+          }}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/80 hover:bg-blue-500 rounded-xl text-white text-sm font-medium transition-colors"
+        >
+          <Eye className="w-4 h-4" />
+          View Profile
+        </motion.button>
         {owned && (
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -258,7 +260,9 @@ export function DarkModeToggle() {
 
 // Navigation Links
 const navLinks: NavLink[] = [
-  { href: "/rooms", label: "Rooms", icon: Users },
+  { href: "/rooms", label: "Rooms", icon: DoorOpen },
+  { href: "/ranks", label: "Ranks", icon: Trophy },
+  { href: "/users", label: "Users", icon: UserRound },
   // { href: "/ranks", label: "Ranks", icon: Trophy },
 ];
 
@@ -308,7 +312,7 @@ export function Navbar() {
   };
 
   const handleShowProfile = (username: string): void => {
-    router.push(`/profile/${username}`)
+    router.push(`/profile/${username}`);
     setShowProfile(false);
   };
 
@@ -335,12 +339,12 @@ export function Navbar() {
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -100, opacity: 0 }}
-          transition={{ 
-            duration: 0.6, 
+          transition={{
+            duration: 0.6,
             ease: "easeInOut",
             type: "spring",
             stiffness: 100,
-            damping: 20
+            damping: 20,
           }}
           className="sticky top-0 z-40 w-full"
         >
@@ -351,14 +355,17 @@ export function Navbar() {
             <div className="flex items-center justify-between h-16">
               {/* Logo */}
               <Link href="/">
-              <motion.div whileHover={{ scale: 1.02 }} className="flex-shrink-0">
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                  Khawawish
-                </h1>
-                <p className="text-xs text-black/70  dark:text-white/60 hidden sm:block">
-                  The Guessing Game
-                </p>
-              </motion.div>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className="flex-shrink-0"
+                >
+                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                    Khawawish
+                  </h1>
+                  <p className="text-xs text-black/70  dark:text-white/60 hidden sm:block">
+                    The Guessing Game
+                  </p>
+                </motion.div>
               </Link>
 
               {/* Desktop Navigation */}

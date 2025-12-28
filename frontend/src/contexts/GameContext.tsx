@@ -25,7 +25,9 @@ type GameContextType = {
   connectedError: boolean;
   selectedIndexes: string[];
   ownImage: string | null;
+  opponentImage: string | null;
   isShiftHeld: boolean;
+  isAltHeld: boolean;
   setSelectedIndexes: Dispatch<SetStateAction<string[]>>;
   setOwnImage: (ownImage: string) => void;
   handleCharacterDiscard: (character: string) => void;
@@ -51,7 +53,7 @@ type GameContextType = {
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const { user, token } = useAuth();
+  const { user, token, authReady } = useAuth();
   const router = useRouter();
 
   const [phase, setPhase] = useState<"selection" | "guessing" | "results">(
@@ -67,26 +69,51 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const handleRefresh = () => setRefreshKey((prev) => prev + 1);
   const [selectedIndexes, setSelectedIndexes] = useState<string[]>([]);
   const [ownImage, setOwnImage] = useState<string | null>(null);
+  const [opponentImage, setOpponentImage] = useState<string | null>(null);
   const [isShiftHeld, setIsShiftHeld] = useState(false);
+  const [isAltHeld, setIsAltHeld] = useState(false);
+  const [previousPathname, setPreviousPathname] = useState<string | null>(null);
 
   const pathname = usePathname();
+  function ResetGame(resetLobby = false, imagesParam: string[] = []) {
+    setImages(imagesParam);
+    setSelectedIndexes([]);
+    setOwnImage(null);
+    setPhase("selection");
+    setStatus(null);
+    if (resetLobby) setCurrentLobby(null);
+  }
+
+  useEffect(() => {
+    if (pathname === previousPathname) return;
+    if (previousPathname === "/game" && pathname !== "/game") {
+      ResetGame(true);
+    }
+
+    setPreviousPathname(pathname);
+  }, [pathname, previousPathname]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Shift") {
         setIsShiftHeld(true);
       }
+      if (e.key === "Alt" || e.altKey) {
+        // Add e.altKey as fallback
+        e.preventDefault(); // Prevent Firefox menu from opening
+        setIsAltHeld(true);
+      }
     };
-
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === "Shift") {
         setIsShiftHeld(false);
       }
+      if (e.key === "Alt" || e.altKey) {
+        setIsAltHeld(false);
+      }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
-
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
@@ -94,18 +121,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (authReady === false) return;
     const okPages = ["/login", "/"];
     const gamePages = ["/lobby", "/game"];
     const isOkPage =
       okPages.includes(pathname) || pathname.startsWith("/profile");
     if (!token && !isOkPage) {
+      console.log("No token, redirecting to login");
       router.replace("/login");
     } else if (!currentLobby && gamePages.includes(pathname)) {
+      console.log("No lobby, redirecting to rooms");
       router.replace("/rooms");
-    } else if (!currentLobby && pathname === "/game") {
-      router.push("/rooms");
     }
-  }, [pathname, token, router, currentLobby]);
+  }, [pathname, token, router, currentLobby, authReady]);
 
   useEffect(() => {
     if (user?.toast_user === true && user?.is_verified) {
@@ -140,12 +168,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setPhase("selection");
           break;
         case "rematch_started":
-          setImages([]);
-          setSelectedIndexes([]);
-          setOwnImage(null);
-          setImages(message.images);
-          setPhase("selection");
-          setStatus(null);
+          ResetGame(true, message.images);
           handleRefresh();
           break;
         case "game_started":
@@ -155,10 +178,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         case "player_joined":
         case "player_left":
         case "player_ready_changed":
-        case "end_turn":
         case "update_lobby":
         case "player_kicked":
           setCurrentLobby(message.lobby);
+          break;
+        case "end_turn":
+          setCurrentLobby(message.lobby);
+          toast.success("It's your turn!");
           break;
         case "new_lobby":
           setLobbies(message.public_lobbies);
@@ -173,16 +199,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           toast.success("Correct guess!");
           setStatus("Win");
           setPhase("results");
+          setOpponentImage(message.character);
+          setCurrentLobby(message.lobby);
           break;
         case "player_scored":
           setStatus("Lose");
           setPhase("results");
+          setOpponentImage(message.character);
+          setCurrentLobby(message.lobby);
           break;
         case "kicked":
           toast.error("You have been kicked from the lobby.");
           router.push("/rooms");
-          setCurrentLobby(null);
-          setStatus(null);
+          ResetGame(true);
           break;
         case "lobby_closed":
           router.push("/rooms");
@@ -193,11 +222,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         case "join_failed":
           toast.error(message.reason || "Failed to start the game.");
           break;
-        case "player_left_in_results":
+        case "player_left_in_game":
           toast.error("The other player has left the game.");
           router.push("/rooms");
-          setCurrentLobby(null);
-          setStatus(null);
+          ResetGame(true);
           break;
         case "connected_error":
           toast.error(message.message || "Connection error.");
@@ -342,8 +370,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         selectedIndexes,
         setSelectedIndexes,
         ownImage,
+        opponentImage,
         setOwnImage,
         isShiftHeld,
+        isAltHeld,
         handleCharacterDiscard,
         handleOwnCharacterSelect,
         handleRefresh,
